@@ -1,0 +1,25 @@
+{
+  "name": "gaurav-autocare-whatsapp-bot",
+  "version": "1.0.0",
+  "description": "Gaurav Autocare WhatsApp Chatbot",
+  "main": "src/index.js",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "dev": "node --watch src/index.js",
+    "start": "node src/index.js",
+    "tunnel": "npx ngrok http 3000",
+    "supabase:deploy": "npx supabase functions deploy --no-verify-jwt --use-api",
+    "supabase:deploy:webhook": "npx supabase functions deploy webhook --no-verify-jwt --use-api",
+    "sync:sheets": "node src/sync-database-to-sheet.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.112.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "google-auth-library": "^9.14.1",
+    "google-spreadsheet": "^4.1.4"
+  }
+}

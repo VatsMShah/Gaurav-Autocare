@@ -1,0 +1,90 @@
+{
+  "version": "6.0",
+  "screens": [
+    {
+      "id": "FUEL_ORDER_FORM",
+      "title": "Fuel Truck Order",
+      "terminal": true,
+      "data": {
+        "customer_name": {
+          "type": "string",
+          "__example__": "Gaurav Sharma"
+        },
+        "customer_phone": {
+          "type": "string",
+          "__example__": "+91 9876543210"
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "⛽ Gaurav Autocare"
+          },
+          {
+            "type": "TextSubheading",
+            "text": "Fuel Truck Order Form"
+          },
+          {
+            "type": "TextBody",
+            "text": "Please provide your fuel truck details below to place an instant order:"
+          },
+          {
+            "type": "TextInput",
+            "name": "vehicle_number",
+            "label": "Vehicle Number",
+            "required": true,
+            "input-type": "text",
+            "helper-text": "e.g. MH04AB1234 or GJ01CD5678"
+          },
+          {
+            "type": "RadioButtonsGroup",
+            "name": "fuel_type",
+            "label": "Select Fuel Type",
+            "required": true,
+            "data-source": [
+              {
+                "id": "Petrol",
+                "title": "Petrol (MS - Motor Spirit)"
+              },
+              {
+                "id": "Diesel",
+                "title": "Diesel (HSD - High Speed Diesel)"
+              }
+            ]
+          },
+          {
+            "type": "TextInput",
+            "name": "litres",
+            "label": "Quantity (in Litres)",
+            "required": true,
+            "input-type": "number",
+            "helper-text": "Enter quantity in litres (e.g. 500, 1000)"
+          },
+          {
+            "type": "TextInput",
+            "name": "amount",
+            "label": "Amount (₹)",
+            "required": true,
+            "input-type": "number",
+            "helper-text": "Enter order amount in INR"
+          },
+          {
+            "type": "Footer",
+            "label": "Confirm & Submit Order",
+            "on-click-action": {
+              "name": "complete",
+              "payload": {
+                "vehicle_number": "${form.vehicle_number}",
+                "fuel_type": "${form.fuel_type}",
+                "litres": "${form.litres}",
+                "amount": "${form.amount}"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
