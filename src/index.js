@@ -59,6 +59,6 @@ app.post('/webhook', async (req, res) => {
 });
 
 app.listen(config.port, () => {
-  logger.info(`Traket WhatsApp bot listening on port ${config.port}`);
+  logger.info(`Gaurav Autocare WhatsApp bot listening on port ${config.port}`);
   logger.info(`Webhook URL (local): http://localhost:${config.port}/webhook`);
 });
