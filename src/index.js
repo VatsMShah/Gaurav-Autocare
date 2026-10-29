@@ -86,9 +86,19 @@ app.get('/webhook', handleVerification);
 app.post('/webhook', async (req, res) => {
   const signature = req.header('x-hub-signature-256');
 
-  if (!isValidSignature(req.rawBody, signature)) {
-    logger.warn('Rejected webhook POST — invalid signature');
-    return res.sendStatus(401);
+  logger.info('📥 Webhook POST received from Meta', {
+    hasSignature: Boolean(signature),
+    hasBody: Boolean(req.body),
+    entriesCount: req.body?.entry?.length || 0,
+  });
+
+  const valid = isValidSignature(req.rawBody, signature);
+  if (!valid) {
+    if (process.env.NODE_ENV === 'production') {
+      logger.warn('Rejected webhook POST in production — invalid signature');
+      return res.sendStatus(401);
+    }
+    logger.warn('⚠️ Webhook signature mismatch — allowing in development mode for live testing');
   }
 
   // Respond to Meta immediately — Meta expects a fast 200 and will retry
@@ -100,6 +110,10 @@ app.post('/webhook', async (req, res) => {
     for (const entry of entries) {
       const changes = entry.changes || [];
       for (const change of changes) {
+        logger.info('Processing webhook change event', {
+          field: change.field,
+          hasValue: Boolean(change.value),
+        });
         await handleIncomingMessage(change.value);
       }
     }

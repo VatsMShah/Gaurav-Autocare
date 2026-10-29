@@ -152,9 +152,71 @@ async function sendFuelOrderFlow(to, flowId, customerInfo = {}) {
   });
 }
 
+/**
+ * Sends a native WhatsApp interactive button message (up to 3 buttons).
+ */
+async function sendInteractiveButtons(to, headerText, bodyText, footerText, buttons) {
+  const payload = {
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to,
+    type: 'interactive',
+    interactive: {
+      type: 'button',
+      body: { text: bodyText },
+      action: {
+        buttons: buttons.map((btn) => ({
+          type: 'reply',
+          reply: { id: btn.id, title: btn.title },
+        })),
+      },
+    },
+  };
+
+  if (headerText) {
+    payload.interactive.header = { type: 'text', text: headerText };
+  }
+  if (footerText) {
+    payload.interactive.footer = { text: footerText };
+  }
+
+  return callGraphApi(payload);
+}
+
+/**
+ * Sends a native WhatsApp interactive list menu (like in user screenshot).
+ */
+async function sendInteractiveList(to, headerText, bodyText, footerText, buttonLabel, sections) {
+  const payload = {
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to,
+    type: 'interactive',
+    interactive: {
+      type: 'list',
+      body: { text: bodyText },
+      action: {
+        button: buttonLabel,
+        sections,
+      },
+    },
+  };
+
+  if (headerText) {
+    payload.interactive.header = { type: 'text', text: headerText };
+  }
+  if (footerText) {
+    payload.interactive.footer = { text: footerText };
+  }
+
+  return callGraphApi(payload);
+}
+
 module.exports = {
   sendText,
   sendCtaButtons,
   sendFlowDatePicker,
   sendFuelOrderFlow,
+  sendInteractiveButtons,
+  sendInteractiveList,
 };

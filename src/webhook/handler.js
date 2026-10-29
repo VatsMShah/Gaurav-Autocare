@@ -144,17 +144,23 @@ async function handleIncomingMessage(value) {
   const phone = value.messages[0]?.from;
 
   // Safe database fetch (if Supabase credentials are configured; otherwise fallback gracefully)
-  let masterRows = [];
+  let sessionRecord = null;
   try {
     if (phone && config.supabase?.key && !config.supabase.key.startsWith('your_')) {
-      masterRows = await db.getMasterRowsByPhone(phone);
+      const client = db.getClient();
+      const { data } = await client
+        .from('bot_sessions')
+        .select('*')
+        .eq('phone', phone)
+        .maybeSingle();
+      sessionRecord = data;
     }
   } catch (dbErr) {
-    logger.info('Supabase not queried (standalone flow mode): ' + dbErr.message);
+    logger.debug('Bot session fetch info: ' + dbErr.message);
   }
 
   // Process Conversation & State Machine
-  const output = processConversation(value, masterRows);
+  const output = processConversation(value, sessionRecord ? [sessionRecord] : []);
 
   // Safe database persist (if configured)
   try {
@@ -185,8 +191,42 @@ async function handleIncomingMessage(value) {
   }
 
   // Handle Response / Flow Action
-  if (output.action === 'send_fuel_flow') {
-    if (config.whatsapp.flowId) {
+  const hasValidFlowId =
+    Boolean(config.whatsapp.flowId) &&
+    config.whatsapp.flowId !== 'your_flow_id_here' &&
+    config.whatsapp.flowId !== '';
+
+  if (output.action === 'send_vehicle_list') {
+    try {
+      await whatsapp.sendInteractiveList(
+        output.phone,
+        output.header,
+        output.response,
+        output.footer,
+        output.buttonLabel,
+        output.sections
+      );
+      logger.info('Sent Interactive Vehicle List to ' + output.phone);
+    } catch (listErr) {
+      logger.warn('Failed to send interactive list, falling back to text', listErr);
+      await whatsapp.sendText(output.phone, output.response);
+    }
+  } else if (output.action === 'send_fuel_buttons' || output.action === 'send_litres_buttons') {
+    try {
+      await whatsapp.sendInteractiveButtons(
+        output.phone,
+        output.header,
+        output.response,
+        output.footer,
+        output.buttons
+      );
+      logger.info(`Sent Interactive Buttons (${output.action}) to ` + output.phone);
+    } catch (btnErr) {
+      logger.warn('Failed to send interactive buttons, falling back to text', btnErr);
+      await whatsapp.sendText(output.phone, output.response);
+    }
+  } else if (output.action === 'send_fuel_flow') {
+    if (hasValidFlowId) {
       try {
         await whatsapp.sendFuelOrderFlow(output.phone, config.whatsapp.flowId, output.customer);
         logger.info('Sent WhatsApp Fuel Order Flow to ' + output.phone);
@@ -195,7 +235,22 @@ async function handleIncomingMessage(value) {
         await whatsapp.sendText(output.phone, output.response);
       }
     } else {
-      // If WHATSAPP_FLOW_ID is not configured yet in .env, send the welcome text
+      logger.info('No flowId configured, sending welcome text to ' + output.phone);
+      await whatsapp.sendText(output.phone, output.response);
+    }
+  } else if (output.action === 'send_ticket') {
+    try {
+      await whatsapp.sendInteractiveButtons(
+        output.phone,
+        '⛽ Gaurav Autocare',
+        output.response,
+        'Thank you for your order!',
+        [
+          { id: 'btn_new_order', title: '📋 Order Another' },
+          { id: 'btn_support', title: '📞 Support' },
+        ]
+      );
+    } catch (ticketErr) {
       await whatsapp.sendText(output.phone, output.response);
     }
   } else if (output.response) {
