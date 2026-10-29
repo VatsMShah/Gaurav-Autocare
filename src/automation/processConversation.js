@@ -189,13 +189,28 @@ function processConversation(waMessagePayload, masterRows = []) {
   const currentState = isGreeting ? 'initial' : previousSession.state || 'initial';
 
   // Case A: User completed the WhatsApp Flow Form (nfm_reply)
-  if (flowResponse && (flowResponse.vehicle_number || flowResponse.fuel_type || flowResponse.litres)) {
+  if (flowResponse && (flowResponse.vehicle_number || flowResponse.fuel_type || flowResponse.litres || flowResponse.amount)) {
     const ticketId = `GA-${Date.now().toString().slice(-6)}`;
+    const fuelType = (flowResponse.fuel_type || 'Diesel').trim();
+    const rate = fuelType.toLowerCase() === 'petrol' ? 104.50 : 92.80;
+
+    let litres = parseFloat(flowResponse.litres || '0') || 0;
+    let amount = parseFloat(flowResponse.amount || '0') || 0;
+
+    if (litres > 0 && amount === 0) {
+      amount = Math.round(litres * rate);
+    } else if (amount > 0 && litres === 0) {
+      litres = Math.round(amount / rate);
+    } else if (litres === 0 && amount === 0) {
+      litres = 500;
+      amount = Math.round(litres * rate);
+    }
+
     const orderDetails = {
-      vehicle_number: (flowResponse.vehicle_number || 'N/A').trim(),
-      fuel_type: (flowResponse.fuel_type || 'Diesel').trim(),
-      litres: (flowResponse.litres || '0').trim(),
-      amount: (flowResponse.amount || '0').trim(),
+      vehicle_number: (flowResponse.vehicle_number || 'N/A').toUpperCase().trim(),
+      fuel_type: fuelType,
+      litres: String(litres),
+      amount: String(amount),
     };
 
     const ticketText = generateOrderTicket({ ticketId, customer, orderDetails });

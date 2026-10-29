@@ -55,20 +55,24 @@
             ]
           },
           {
+            "type": "TextCaption",
+            "text": "💡 Enter either Quantity (Litres) OR Order Amount (₹). The other will be calculated automatically based on daily fuel rates."
+          },
+          {
             "type": "TextInput",
             "name": "litres",
             "label": "Quantity (in Litres)",
-            "required": true,
+            "required": false,
             "input-type": "number",
-            "helper-text": "Enter quantity in litres (e.g. 500, 1000)"
+            "helper-text": "e.g. 500, 1000, 2000 Litres (Optional if amount is filled)"
           },
           {
             "type": "TextInput",
             "name": "amount",
-            "label": "Amount (₹)",
-            "required": true,
+            "label": "Or Budget Amount (₹)",
+            "required": false,
             "input-type": "number",
-            "helper-text": "Enter order amount in INR"
+            "helper-text": "e.g. 50000, 100000 in INR (Optional if litres is filled)"
           },
           {
             "type": "Footer",
