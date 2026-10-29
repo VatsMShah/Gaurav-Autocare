@@ -68,7 +68,7 @@ function generateWelcomeMessage(customer) {
     `Please reply with your Fuel Truck order in this exact 3-line format:\n\n` +
     `*Vehicle Number*\n` +
     `*Diesel or Petrol*\n` +
-    `*Quantity (Litres) OR Price (₹)* _(Please enter only one)_\n\n` +
+    `*Quantity (Litres) OR Price (Rupees)* _(Please enter only one)_\n\n` +
     `📝 *Example 1 (By Quantity):*\n` +
     `MH04XZ1212\n` +
     `Diesel\n` +
@@ -76,7 +76,7 @@ function generateWelcomeMessage(customer) {
     `📝 *Example 2 (By Price):*\n` +
     `MH04XZ1212\n` +
     `Petrol\n` +
-    `₹22,000`
+    `2200 Rupees`
   );
 }
 
@@ -120,7 +120,7 @@ function validateAndParseFuelOrder(text) {
   }
 
   // 3. Quantity (Litres) OR Price (Rupees) Validation
-  // Check for price explicitly: ₹50000, 50000 rs, rs 50000, 50000 inr, price 50000, etc.
+  // Check for price explicitly: 2200 rupees, 2200 rs, rs 2200, 2200 inr, price 2200, ₹2200, etc.
   const amountMatch =
     clean.match(/(?:₹|rs\.?|inr|rupees|amount|price)\s*(\d[\d,]*)/i) ||
     clean.match(/(\d[\d,]*)\s*(?:rs|inr|rupees)/i);
@@ -132,7 +132,6 @@ function validateAndParseFuelOrder(text) {
   let amount = 0;
 
   if (amountMatch && litresMatch) {
-    // User mentioned both
     litres = parseInt(litresMatch[1].replace(/,/g, ''), 10);
     amount = parseInt(amountMatch[1].replace(/,/g, ''), 10);
   } else if (amountMatch) {
@@ -142,7 +141,7 @@ function validateAndParseFuelOrder(text) {
     litres = parseInt(litresMatch[1].replace(/,/g, ''), 10);
     amount = Math.round(litres * rate);
   } else {
-    // Check if user entered a number without specifying Litres or Price (e.g. "22000" or "500")
+    // Check if user entered a number without specifying Litres or Price (e.g. "2200" or "1000")
     let textWithoutPlate = clean;
     if (plateMatch) {
       textWithoutPlate = textWithoutPlate.replace(plateMatch[0], '');
@@ -150,9 +149,9 @@ function validateAndParseFuelOrder(text) {
     const rawNumbers = textWithoutPlate.match(/\b\d+\b/g) || [];
     if (rawNumbers.length > 0) {
       const nakedNum = rawNumbers[rawNumbers.length - 1];
-      errors.push(`❌ *Unit Missing for "${nakedNum}":* Please specify whether *${nakedNum}* is *Litres* (e.g. *${nakedNum} Litres*) OR *Rupees* (e.g. *₹${nakedNum}*).`);
+      errors.push(`❌ *Unit Missing for "${nakedNum}":* Please specify whether *${nakedNum}* is *Litres* (e.g. *${nakedNum} Litres*) OR *Rupees* (e.g. *${nakedNum} Rupees*).`);
     } else {
-      errors.push('❌ *Quantity or Price Missing:* Please enter either quantity in litres (e.g. *1000 Litres*) OR price (e.g. *₹22,000*).');
+      errors.push('❌ *Quantity or Price Missing:* Please enter either quantity in litres (e.g. *1000 Litres*) OR price (e.g. *2200 Rupees*).');
     }
   }
 
@@ -170,7 +169,7 @@ function validateAndParseFuelOrder(text) {
         `_or_\n\n` +
         `MH04XZ1212\n` +
         `Petrol\n` +
-        `₹22,000`,
+        `2200 Rupees`,
     };
   }
 
@@ -203,6 +202,8 @@ function processConversation(waMessagePayload, masterRows = []) {
   // 2. Identify message type and content
   let textBody = '';
   let flowResponse = null;
+  let buttonId = '';
+  let buttonTitle = '';
 
   if (msg?.type === 'text') {
     textBody = (msg.text?.body || '').trim();
@@ -211,20 +212,72 @@ function processConversation(waMessagePayload, masterRows = []) {
       const responseJsonStr = msg.interactive.nfm_reply?.response_json || '{}';
       flowResponse = safeJsonParse(responseJsonStr, null);
     } else if (msg.interactive?.button_reply) {
-      textBody = (msg.interactive.button_reply.id || msg.interactive.button_reply.title || '').trim();
+      buttonId = msg.interactive.button_reply.id || '';
+      buttonTitle = msg.interactive.button_reply.title || '';
+      textBody = (buttonId || buttonTitle).trim();
     } else if (msg.interactive?.list_reply) {
       textBody = (msg.interactive.list_reply.title || msg.interactive.list_reply.id || '').trim();
     }
+  } else if (msg?.type === 'button') {
+    buttonId = msg.button?.payload || '';
+    buttonTitle = msg.button?.text || '';
+    textBody = (buttonId || buttonTitle).trim();
   }
 
-  const lowerText = textBody.toLowerCase();
-  const isGreeting =
+  const cleanText = textBody.toLowerCase().trim();
+  const normalizedText = cleanText.replace(/^[^\p{L}\p{N}]+/u, '').replace(/[^\p{L}\p{N}]+$/u, '').trim();
+
+  // Handle "Order Another", new order, restart, or greeting
+  const isNewOrder =
     !flowResponse &&
-    ['hi', 'hii', 'hello', 'hey', 'start', 'restart', 'menu', 'reset'].includes(lowerText);
+    (
+      buttonId === 'btn_new_order' ||
+      buttonTitle.toLowerCase().includes('order another') ||
+      buttonTitle.toLowerCase().includes('new order') ||
+      normalizedText === 'btn_new_order' ||
+      normalizedText.includes('order another') ||
+      normalizedText.includes('another order') ||
+      normalizedText.includes('new order') ||
+      normalizedText.includes('order again') ||
+      normalizedText.includes('start again') ||
+      normalizedText.includes('reorder') ||
+      normalizedText === 'another' ||
+      normalizedText === 'order' ||
+      ['hi', 'hii', 'hello', 'hey', 'start', 'restart', 'menu', 'reset'].includes(normalizedText)
+    );
+
+  // Handle "Support" button
+  const isSupport =
+    !flowResponse &&
+    (
+      buttonId === 'btn_support' ||
+      buttonTitle.toLowerCase().includes('support') ||
+      normalizedText === 'btn_support' ||
+      normalizedText.includes('support') ||
+      normalizedText.includes('help') ||
+      normalizedText.includes('contact')
+    );
+
+  if (isSupport) {
+    return {
+      user_id: `${phone}_${Date.now()}`,
+      phone,
+      customer,
+      state: 'awaiting_details',
+      action: 'send_text',
+      response:
+        `📞 *Gaurav Autocare Support & Dispatch Desk:*\n\n` +
+        `• Phone / WhatsApp: +91 93232 65076\n` +
+        `• Email: admin@gauravauto.com\n` +
+        `• Operating Hours: 24/7 Bulk Fuel Dispatch\n\n` +
+        `Reply *Order Another* or *Hi* anytime to place a fuel truck order! ⛽🚛`,
+      updated_at: new Date().toISOString(),
+    };
+  }
 
   // Retrieve previous session state
   const previousSession = memorySessions.get(phone) || {};
-  const currentState = isGreeting ? 'initial' : previousSession.state || 'initial';
+  const currentState = isNewOrder ? 'initial' : previousSession.state || 'initial';
 
   // Case A: User completed the WhatsApp Flow Form (nfm_reply)
   if (flowResponse && (flowResponse.vehicle_number || flowResponse.fuel_type || flowResponse.litres || flowResponse.amount)) {
@@ -270,8 +323,8 @@ function processConversation(waMessagePayload, masterRows = []) {
     };
   }
 
-  // Text 1 (Bot): User sends Hi or starts conversation -> Send Welcome Text with exact 3-line format
-  if (currentState === 'initial' || isGreeting) {
+  // Text 1 (Bot): User sends Hi or starts conversation or clicks Order Another -> Send Welcome Text with exact 3-line format
+  if (currentState === 'initial' || isNewOrder) {
     const welcomeText = generateWelcomeMessage(customer);
 
     memorySessions.set(phone, {
@@ -358,5 +411,6 @@ module.exports = {
   processConversation,
   generateOrderTicket,
   generateWelcomeMessage,
+  validateAndParseFuelOrder,
   memorySessions,
 };
