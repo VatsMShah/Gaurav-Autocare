@@ -140,12 +140,104 @@ async function saveSupportRow(row) {
   }
 }
 
+// ---------------------------------------------------------------------
+// GAURAV AUTOCARE TABLES: fuel_truck_orders, customers, fuel_rates, bot_sessions
+// ---------------------------------------------------------------------
+
 /**
- * Bulk sync an array of bookings to Google Sheets
+ * Save / Update fuel truck order in Google Sheets
+ */
+async function saveFuelTruckOrder(order) {
+  if (!isConfigured()) return order;
+  try {
+    const formattedRow = {
+      ticket_id: order.ticketId || order.ticket_id,
+      customer_name: order.customerName || order.customer_name || 'Valued Customer',
+      phone: order.phone || '',
+      vehicle_number: (order.vehicleNumber || order.vehicle_number || '').toUpperCase(),
+      fuel_type: order.fuelType || order.fuel_type || 'Diesel',
+      litres: parseFloat(order.litres) || 0,
+      estimated_amount: parseFloat(order.amount || order.estimated_amount) || 0,
+      order_status: order.orderStatus || order.order_status || 'confirmed',
+      payment_status: order.paymentStatus || order.payment_status || 'pending',
+      source: order.source || 'whatsapp_bot',
+      created_at: order.created_at || new Date().toISOString(),
+      updated_at: order.updated_at || new Date().toISOString(),
+    };
+    return await store.upsertRow('fuel_truck_orders', 'ticket_id', formattedRow);
+  } catch (err) {
+    logger.warn('Google Sheets saveFuelTruckOrder failed:', err.message);
+    return order;
+  }
+}
+
+/**
+ * Save / Update customer in Google Sheets
+ */
+async function saveCustomer(customer) {
+  if (!isConfigured()) return customer;
+  try {
+    const formattedRow = {
+      phone: customer.phone,
+      name: customer.name,
+      company_name: customer.company_name || customer.company || '',
+      email: customer.email || '',
+      gstin: customer.gstin || '',
+      created_at: customer.created_at || new Date().toISOString(),
+      updated_at: customer.updated_at || new Date().toISOString(),
+    };
+    return await store.upsertRow('customers', 'phone', formattedRow);
+  } catch (err) {
+    logger.warn('Google Sheets saveCustomer failed:', err.message);
+    return customer;
+  }
+}
+
+/**
+ * Save / Update fuel rate in Google Sheets
+ */
+async function saveFuelRate(rate) {
+  if (!isConfigured()) return rate;
+  try {
+    const formattedRow = {
+      fuel_type: rate.fuel_type,
+      rate_per_litre: parseFloat(rate.rate_per_litre) || 0,
+      effective_date: rate.effective_date || new Date().toISOString().split('T')[0],
+      updated_at: rate.updated_at || new Date().toISOString(),
+    };
+    return await store.upsertRow('fuel_rates', 'fuel_type', formattedRow);
+  } catch (err) {
+    logger.warn('Google Sheets saveFuelRate failed:', err.message);
+    return rate;
+  }
+}
+
+/**
+ * Save / Update WhatsApp bot session in Google Sheets
+ */
+async function saveBotSession(phone, state, sessionData = {}) {
+  if (!isConfigured()) return null;
+  try {
+    const formattedRow = {
+      phone,
+      state,
+      flow_type: 'fuel_order',
+      session_data: typeof sessionData === 'object' ? JSON.stringify(sessionData) : sessionData,
+      updated_at: new Date().toISOString(),
+    };
+    return await store.upsertRow('bot_sessions', 'phone', formattedRow);
+  } catch (err) {
+    logger.warn('Google Sheets saveBotSession failed:', err.message);
+    return null;
+  }
+}
+
+/**
+ * Bulk sync an array of bookings to Google Sheets (legacy)
  */
 async function syncAllBookingsToSheets(bookings) {
   if (!isConfigured()) {
-    throw new Error('Google Sheets is not configured. Please add GOOGLE_SERVICE_ACCOUNT_EMAIL, GOOGLE_PRIVATE_KEY, and GOOGLE_SHEET_ID in .env');
+    throw new Error('Google Sheets is not configured. Please add GOOGLE_SHEET_WEBHOOK_URL or GOOGLE_SERVICE_ACCOUNT_EMAIL in .env');
   }
   let count = 0;
   for (const b of bookings) {
@@ -161,6 +253,10 @@ async function syncAllBookingsToSheets(bookings) {
 
 module.exports = {
   isConfigured,
+  saveFuelTruckOrder,
+  saveCustomer,
+  saveFuelRate,
+  saveBotSession,
   getMasterRowsByPhone,
   saveMasterSession,
   getBookVehicleRow,

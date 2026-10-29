@@ -1,6 +1,7 @@
 const config = require('../config');
 const { processConversation } = require('../automation/processConversation');
 const db = require('../services/supabase');
+const sheets = require('../services/sheets');
 const whatsapp = require('../services/whatsapp');
 const logger = require('../utils/logger');
 
@@ -165,15 +166,22 @@ async function handleIncomingMessage(value) {
   // Safe database persist (if configured)
   try {
     if (config.supabase?.key && !config.supabase.key.startsWith('your_')) {
-      await db.upsertBotSession(output.phone, output.state, {
+      const sessionData = {
         customer: output.customer,
         orderDetails: output.orderDetails,
-      });
+      };
+      await db.upsertBotSession(output.phone, output.state, sessionData);
+
+      if (sheets.isConfigured()) {
+        sheets.saveBotSession(output.phone, output.state, sessionData).catch((e) =>
+          logger.warn('Google Sheet session sync error:', e.message)
+        );
+      }
 
       // If user placed a fuel truck order, save to fuel_truck_orders table
       if (output.action === 'send_ticket' && output.orderDetails) {
         const parsedSession = JSON.parse(output.data || '{}');
-        await db.saveFuelTruckOrder({
+        const orderRecord = {
           ticketId: parsedSession.ticketId,
           customerName: output.customer?.name,
           phone: output.phone,
@@ -183,11 +191,19 @@ async function handleIncomingMessage(value) {
           amount: output.orderDetails.amount,
           orderStatus: 'confirmed',
           paymentStatus: 'pending',
-        });
+        };
+        await db.saveFuelTruckOrder(orderRecord);
+
+        // Mirror order to Google Sheets
+        if (sheets.isConfigured()) {
+          sheets.saveFuelTruckOrder(orderRecord).catch((e) =>
+            logger.warn('Google Sheet order sync error:', e.message)
+          );
+        }
       }
     }
   } catch (persistErr) {
-    logger.info('Supabase persist skipped (standalone flow mode): ' + persistErr.message);
+    logger.info('Database persist skipped: ' + persistErr.message);
   }
 
   // Handle Response / Flow Action
