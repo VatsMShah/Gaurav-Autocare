@@ -65,85 +65,123 @@ function generateWelcomeMessage(customer) {
     `🙏 *Hii, Welcome to Gaurav Autocare* ⛽🚛\n\n` +
     `👤 *Customer Name:* ${customer.name}\n` +
     `📱 *Mobile Number:* ${customer.phone}\n\n` +
-    `Welcome to our automated Fuel Truck Ordering service!\n\n` +
-    `Please reply with your Fuel Truck order details:\n` +
-    `• *Vehicle Number:* (e.g. MH04AB1234)\n` +
-    `• *Fuel Type:* Petrol or Diesel\n` +
-    `• *Quantity or Price:* (e.g. 1000 Litres or ₹50,000)\n\n` +
-    `💡 *Example format:*\n` +
-    `\`MH04AB1234, Diesel, 1000 Litres\`\n` +
-    `_or_\n` +
-    `\`MH05678, Petrol, 500 Litres\``
+    `Please reply with your Fuel Truck order in this exact 3-line format:\n\n` +
+    `*Vehicle Number*\n` +
+    `*Diesel or Petrol*\n` +
+    `*Quantity (Litres) OR Price (₹)* _(Please enter only one)_\n\n` +
+    `📝 *Example 1 (By Quantity):*\n` +
+    `MH04XZ1212\n` +
+    `Diesel\n` +
+    `1000 Litres\n\n` +
+    `📝 *Example 2 (By Price):*\n` +
+    `MH04XZ1212\n` +
+    `Petrol\n` +
+    `₹22,000`
   );
 }
 
 /**
- * Parses user single-message input containing vehicle number, fuel type, and litres/price
+ * Validates and parses user single-message input containing:
+ * Line 1: Vehicle number
+ * Line 2: Diesel or Petrol
+ * Line 3: Quantity (Litres) OR Price (Rupees)
  */
-function parseFuelOrderText(text) {
+function validateAndParseFuelOrder(text) {
   const clean = String(text || '').trim();
   const lower = clean.toLowerCase();
+  const errors = [];
 
-  // 1. Detect Fuel Type (Petrol or Diesel)
-  let fuelType = 'Diesel';
-  let rate = 92.80;
-  if (lower.includes('petrol') || lower.includes('ms')) {
-    fuelType = 'Petrol';
-    rate = 104.50;
+  // 1. Vehicle Number Validation
+  // Indian vehicle registration pattern (e.g. MH04XZ1212, MH05678, DL01AB1234, GJ01CD5678, etc.)
+  const plateMatch = clean.match(/\b([A-Z]{2}[-\s]?[0-9]{1,2}[-\s]?[A-Z]{0,3}[-\s]?[0-9]{3,4})\b/i);
+  let vehicleNumber = '';
+  if (plateMatch) {
+    vehicleNumber = plateMatch[1].replace(/[-\s]/g, '').toUpperCase();
+  } else {
+    errors.push('❌ *Vehicle Number Invalid:* Please provide a valid vehicle registration number (e.g. *MH04XZ1212* or *MH05678*).');
   }
 
-  // 2. Detect Litres or Amount/Price
+  // 2. Fuel Type Validation (Must explicitly be Petrol or Diesel)
+  let fuelType = null;
+  let rate = 92.80;
+  const hasDiesel = /\b(diesel|hsd)\b/i.test(lower);
+  const hasPetrol = /\b(petrol|ms)\b/i.test(lower);
+
+  if (hasDiesel && !hasPetrol) {
+    fuelType = 'Diesel';
+    rate = 92.80;
+  } else if (hasPetrol && !hasDiesel) {
+    fuelType = 'Petrol';
+    rate = 104.50;
+  } else if (hasDiesel && hasPetrol) {
+    errors.push('❌ *Conflicting Fuel Type:* Please choose only *Diesel* OR *Petrol*, not both.');
+  } else {
+    errors.push('❌ *Fuel Type Invalid:* Please specify either *Diesel* or *Petrol*. (Other fuel types are not supported).');
+  }
+
+  // 3. Quantity (Litres) OR Price (Rupees) Validation
+  // Check for price explicitly: ₹50000, 50000 rs, rs 50000, 50000 inr, price 50000, etc.
+  const amountMatch =
+    clean.match(/(?:₹|rs\.?|inr|rupees|amount|price)\s*(\d[\d,]*)/i) ||
+    clean.match(/(\d[\d,]*)\s*(?:rs|inr|rupees)/i);
+
+  // Check for litres explicitly: 1000 litres, 1000 ltr, 1000L, 1000 l, etc.
+  const litresMatch = clean.match(/(\d[\d,]*)\s*(?:litres?|liters?|ltrs?|ltr|l)\b/i);
+
   let litres = 0;
   let amount = 0;
 
-  // Check for price/amount: e.g. "₹50000", "50000 rs", "rs 50000", "price 50000", "amount 50000"
-  const amountMatch =
-    clean.match(/(?:₹|rs\.?|inr|amount|price)\s*(\d[\d,]*)/i) ||
-    clean.match(/(\d[\d,]*)\s*(?:rs|inr|rupees)/i);
-
-  // Check for litres: e.g. "1000 litres", "1000 ltr", "1000L", "1000 l"
-  const litresMatch = clean.match(/(\d[\d,]*)\s*(?:litres?|liters?|ltrs?|ltr|l)\b/i);
-
-  if (amountMatch) {
+  if (amountMatch && litresMatch) {
+    // User mentioned both
+    litres = parseInt(litresMatch[1].replace(/,/g, ''), 10);
+    amount = parseInt(amountMatch[1].replace(/,/g, ''), 10);
+  } else if (amountMatch) {
     amount = parseInt(amountMatch[1].replace(/,/g, ''), 10);
     litres = Math.round(amount / rate);
   } else if (litresMatch) {
     litres = parseInt(litresMatch[1].replace(/,/g, ''), 10);
     amount = Math.round(litres * rate);
   } else {
-    // Look for any standalone quantity number (e.g. 100, 500, 1000)
-    const numbers = clean.match(/\b\d{2,6}\b/g) || [];
-    if (numbers.length > 0) {
-      const num = parseInt(numbers[numbers.length - 1], 10);
-      if (num >= 50 && num <= 50000) {
-        litres = num;
-        amount = Math.round(litres * rate);
-      } else {
-        litres = 500;
-        amount = Math.round(litres * rate);
-      }
+    // Check if user entered a number without specifying Litres or Price (e.g. "22000" or "500")
+    let textWithoutPlate = clean;
+    if (plateMatch) {
+      textWithoutPlate = textWithoutPlate.replace(plateMatch[0], '');
+    }
+    const rawNumbers = textWithoutPlate.match(/\b\d+\b/g) || [];
+    if (rawNumbers.length > 0) {
+      const nakedNum = rawNumbers[rawNumbers.length - 1];
+      errors.push(`❌ *Unit Missing for "${nakedNum}":* Please specify whether *${nakedNum}* is *Litres* (e.g. *${nakedNum} Litres*) OR *Rupees* (e.g. *₹${nakedNum}*).`);
     } else {
-      litres = 500;
-      amount = Math.round(litres * rate);
+      errors.push('❌ *Quantity or Price Missing:* Please enter either quantity in litres (e.g. *1000 Litres*) OR price (e.g. *₹22,000*).');
     }
   }
 
-  // 3. Detect Vehicle Number
-  // Format: MH04AB1234, MH05678, DL01AB1234, GJ01CD5678, etc.
-  const plateMatch = clean.match(/[A-Z]{2}[-\s]?[0-9]{1,2}[-\s]?[A-Z]{0,3}[-\s]?[0-9]{3,4}/i);
-  let vehicleNumber = '';
-  if (plateMatch) {
-    vehicleNumber = plateMatch[0].replace(/[-\s]/g, '').toUpperCase();
-  } else {
-    const parts = clean.split(/[,;\n\s]+/);
-    vehicleNumber = (parts[0] || 'MH04AB1234').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+  if (errors.length > 0) {
+    return {
+      isValid: false,
+      errors,
+      recorrectionMessage:
+        `⚠️ *Order Details Incomplete / Need Correction:*\n\n` +
+        errors.join('\n\n') +
+        `\n\n👉 *Please send your order again in this format:*\n` +
+        `MH04XZ1212\n` +
+        `Diesel\n` +
+        `1000 Litres\n\n` +
+        `_or_\n\n` +
+        `MH04XZ1212\n` +
+        `Petrol\n` +
+        `₹22,000`,
+    };
   }
 
   return {
-    vehicle_number: vehicleNumber || 'MH04AB1234',
-    fuel_type: fuelType,
-    litres: String(litres),
-    amount: String(amount),
+    isValid: true,
+    orderDetails: {
+      vehicle_number: vehicleNumber,
+      fuel_type: fuelType,
+      litres: String(litres),
+      amount: String(amount),
+    },
   };
 }
 
@@ -151,8 +189,8 @@ function parseFuelOrderText(text) {
  * Main conversation processor for Gaurav Autocare WhatsApp Bot.
  * Streamlined 3-text flow:
  * Text 1 (Bot): Welcome message with vehicle, petrol/diesel, litres/price prompt
- * Text 2 (User): User replies with details (e.g. MH04AB1234, Diesel, 1000 Litres)
- * Text 3 (Bot): Bot sends confirmed Ticket
+ * Text 2 (User): User replies with details (e.g. MH04XZ1212, Diesel, 1000 Litres)
+ * Text 3 (Bot): Bot sends confirmed Ticket (or recorrection message if invalid)
  */
 function processConversation(waMessagePayload, masterRows = []) {
   const chat = waMessagePayload || {};
@@ -232,7 +270,7 @@ function processConversation(waMessagePayload, masterRows = []) {
     };
   }
 
-  // Text 1 (Bot): User sends Hi or starts conversation -> Send Welcome Text with prompt
+  // Text 1 (Bot): User sends Hi or starts conversation -> Send Welcome Text with exact 3-line format
   if (currentState === 'initial' || isGreeting) {
     const welcomeText = generateWelcomeMessage(customer);
 
@@ -254,10 +292,31 @@ function processConversation(waMessagePayload, masterRows = []) {
     };
   }
 
-  // Text 2 (User sends details) -> Text 3 (Bot sends Ticket)
+  // Text 2 (User sends details) -> Validate!
   if (currentState === 'awaiting_details' || currentState === 'order_confirmed') {
-    // Parse vehicle number, petrol/diesel, and litres/price from user text
-    const orderDetails = parseFuelOrderText(textBody);
+    const validation = validateAndParseFuelOrder(textBody);
+
+    // If validation fails -> Send recorrection message!
+    if (!validation.isValid) {
+      memorySessions.set(phone, {
+        state: 'awaiting_details',
+        data: { customer },
+        updated_at: new Date().toISOString(),
+      });
+
+      return {
+        user_id: `${phone}_${Date.now()}`,
+        phone,
+        customer,
+        state: 'awaiting_details',
+        action: 'send_text',
+        response: validation.recorrectionMessage,
+        updated_at: new Date().toISOString(),
+      };
+    }
+
+    // Validation PASSED -> Generate Ticket & Confirm Order!
+    const { orderDetails } = validation;
     const ticketId = `GA-${Date.now().toString().slice(-6)}`;
 
     const ticketText = generateOrderTicket({ ticketId, customer, orderDetails });
