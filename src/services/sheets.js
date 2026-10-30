@@ -2,142 +2,32 @@ const store = require('./sheetsStore');
 const config = require('../config');
 const logger = require('../utils/logger');
 
-const TABS = config.google?.tabs || {
-  master: 'users_master',
-  book: 'BookVehicle',
-  provider: 'ProvideVehicle',
-  support: 'Support',
+const TABS = {
+  orders: 'fuel_truck_orders',
+  customers: 'customers',
+  rates: 'fuel_rates',
+  sessions: 'bot_sessions',
 };
 
 function isConfigured() {
   return Boolean(config.google?.isConfigured);
 }
 
-// ---------------------------------------------------------------------
-// users_master  (equivalent of "Get Master Row" / "Save Master Session")
-// ---------------------------------------------------------------------
-
-/** Equivalent of "Get Master Row" — filters users_master by exact phone match. */
-async function getMasterRowsByPhone(phone) {
-  if (!isConfigured()) return [];
-  try {
-    const rows = await store.findRows(TABS.master, 'phone', phone);
-    return rows.map((r) => r.toObject());
-  } catch (err) {
-    logger.warn('Google Sheets getMasterRowsByPhone failed:', err.message);
-    return [];
-  }
-}
-
-/** Equivalent of "Save Master Session" — upsert keyed on user_id. */
-async function saveMasterSession(row) {
-  if (!isConfigured()) return row;
-  try {
-    return await store.upsertRow(TABS.master, 'user_id', {
-      user_id: row.user_id,
-      state: row.state,
-      updated_at: row.updated_at,
-      flowType: row.flowType,
-      phone: row.phone,
-      data: row.data,
-    });
-  } catch (err) {
-    logger.warn('Google Sheets saveMasterSession failed:', err.message);
-    return row;
-  }
-}
-
-// ---------------------------------------------------------------------
-// BookVehicle  (equivalent of "BookVehicleGetRows" / "BookVehicleAppendUpdateRow")
-// ---------------------------------------------------------------------
-
-async function getBookVehicleRow(userId) {
-  if (!isConfigured()) return {};
-  try {
-    const rows = await store.findRows(TABS.book, 'user_id', userId);
-    return rows.length > 0 ? rows[0].toObject() : {};
-  } catch (err) {
-    logger.warn('Google Sheets getBookVehicleRow failed:', err.message);
-    return {};
-  }
-}
-
-async function saveBookVehicleRow(row) {
-  if (!isConfigured()) return row;
-  try {
-    const formattedRow = {
-      user_id: row.user_id,
-      phone: row.phone || '',
-      loadingDate: row.loadingDate || row.loading_date || '',
-      loadingTime: row.loadingTime || row.time_slot || '',
-      origin: row.origin || row.loadingYard || row.stuffingAddress || row.loadingPin || '',
-      destination: row.destination || row.unloadingAddress || row.portCfs || row.unloadingPin || '',
-      cargoType: row.cargoType || row.cargo_type || '',
-      vehicleType: row.vehicleType || row.vehicle_or_container || '',
-      vehicleSubType: row.vehicleSubType || '',
-      weight: row.weight || '',
-      material: row.material || row.shippingLine || row.material_or_line || '',
-      company: row.company || row.company_name || '',
-      contactName: row.contactName || row.contact_name || '',
-      email: row.email || '',
-      remarks: row.remarks || '',
-      updated_at: row.updated_at || new Date().toISOString(),
-    };
-    return await store.upsertRow(TABS.book, 'user_id', formattedRow);
-  } catch (err) {
-    logger.warn('Google Sheets saveBookVehicleRow failed:', err.message);
-    return row;
-  }
-}
-
-// ---------------------------------------------------------------------
-// ProvideVehicle  (equivalent of "ProvideVehicleGetRows" / "ProvideVehicleAppendUpdateRow1")
-// ---------------------------------------------------------------------
-
-async function getProvideVehicleRow(userId) {
-  if (!isConfigured()) return {};
-  try {
-    const rows = await store.findRows(TABS.provider, 'user_id', userId);
-    return rows.length > 0 ? rows[0].toObject() : {};
-  } catch (err) {
-    logger.warn('Google Sheets getProvideVehicleRow failed:', err.message);
-    return {};
-  }
-}
-
-async function saveProvideVehicleRow(row) {
-  if (!isConfigured()) return row;
-  try {
-    return await store.upsertRow(TABS.provider, 'user_id', row);
-  } catch (err) {
-    logger.warn('Google Sheets saveProvideVehicleRow failed:', err.message);
-    return row;
-  }
-}
-
-// ---------------------------------------------------------------------
-// Support  (equivalent of "SupportGetRows" / "SupportAppendUpdateRow")
-// ---------------------------------------------------------------------
-
-async function getSupportRow(userId) {
-  if (!isConfigured()) return {};
-  try {
-    const rows = await store.findRows(TABS.support, 'user_id', userId);
-    return rows.length > 0 ? rows[0].toObject() : {};
-  } catch (err) {
-    logger.warn('Google Sheets getSupportRow failed:', err.message);
-    return {};
-  }
-}
-
-async function saveSupportRow(row) {
-  if (!isConfigured()) return row;
-  try {
-    return await store.upsertRow(TABS.support, 'user_id', row);
-  } catch (err) {
-    logger.warn('Google Sheets saveSupportRow failed:', err.message);
-    return row;
-  }
+/**
+ * Format timestamp to Indian Standard Time (IST)
+ */
+function toISTString(date = new Date()) {
+  const d = date instanceof Date ? date : new Date(date);
+  if (isNaN(d.getTime())) return new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+  return d.toLocaleString('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  });
 }
 
 // ---------------------------------------------------------------------
@@ -152,23 +42,42 @@ async function saveFuelTruckOrder(order) {
   try {
     const formattedRow = {
       ticket_id: order.ticketId || order.ticket_id,
+      created_at: order.created_at || order.createdAt || toISTString(),
       customer_name: order.customerName || order.customer_name || 'Valued Customer',
       phone: order.phone || '',
       vehicle_number: (order.vehicleNumber || order.vehicle_number || '').toUpperCase(),
       fuel_type: order.fuelType || order.fuel_type || 'Diesel',
       litres: parseFloat(order.litres) || 0,
+      rate_per_litre: parseFloat(order.ratePerLitre || order.rate_per_litre) || 0,
       estimated_amount: parseFloat(order.amount || order.estimated_amount) || 0,
-      order_status: order.orderStatus || order.order_status || 'confirmed',
-      payment_status: order.paymentStatus || order.payment_status || 'pending',
+      order_status: order.orderStatus || order.order_status || 'Confirmed',
+      payment_status: order.paymentStatus || order.payment_status || 'Pending',
       source: order.source || 'whatsapp_bot',
-      created_at: order.created_at || new Date().toISOString(),
-      updated_at: order.updated_at || new Date().toISOString(),
+      updated_at: toISTString(),
     };
-    return await store.upsertRow('fuel_truck_orders', 'ticket_id', formattedRow);
+    return await store.upsertRow(TABS.orders, 'ticket_id', formattedRow);
   } catch (err) {
     logger.warn('Google Sheets saveFuelTruckOrder failed:', err.message);
     return order;
   }
+}
+
+/**
+ * Fetch live fuel rates from Google Sheet
+ */
+async function getFuelRates() {
+  if (!isConfigured()) {
+    return { Diesel: 92.80, Petrol: 104.50 };
+  }
+  return store.getFuelRates();
+}
+
+/**
+ * Fetch registered customer from Google Sheet
+ */
+async function getCustomerByPhone(phone) {
+  if (!isConfigured() || !phone) return null;
+  return store.getCustomerByPhone(phone);
 }
 
 /**
@@ -183,10 +92,10 @@ async function saveCustomer(customer) {
       company_name: customer.company_name || customer.company || '',
       email: customer.email || '',
       gstin: customer.gstin || '',
-      created_at: customer.created_at || new Date().toISOString(),
-      updated_at: customer.updated_at || new Date().toISOString(),
+      created_at: customer.created_at || toISTString(),
+      updated_at: toISTString(),
     };
-    return await store.upsertRow('customers', 'phone', formattedRow);
+    return await store.upsertRow(TABS.customers, 'phone', formattedRow);
   } catch (err) {
     logger.warn('Google Sheets saveCustomer failed:', err.message);
     return customer;
@@ -203,9 +112,9 @@ async function saveFuelRate(rate) {
       fuel_type: rate.fuel_type,
       rate_per_litre: parseFloat(rate.rate_per_litre) || 0,
       effective_date: rate.effective_date || new Date().toISOString().split('T')[0],
-      updated_at: rate.updated_at || new Date().toISOString(),
+      updated_at: toISTString(),
     };
-    return await store.upsertRow('fuel_rates', 'fuel_type', formattedRow);
+    return await store.upsertRow(TABS.rates, 'fuel_type', formattedRow);
   } catch (err) {
     logger.warn('Google Sheets saveFuelRate failed:', err.message);
     return rate;
@@ -223,37 +132,84 @@ async function saveBotSession(phone, state, sessionData = {}) {
       state,
       flow_type: 'fuel_order',
       session_data: typeof sessionData === 'object' ? JSON.stringify(sessionData) : sessionData,
-      updated_at: new Date().toISOString(),
+      updated_at: toISTString(),
     };
-    return await store.upsertRow('bot_sessions', 'phone', formattedRow);
+    return await store.upsertRow(TABS.sessions, 'phone', formattedRow);
   } catch (err) {
     logger.warn('Google Sheets saveBotSession failed:', err.message);
     return null;
   }
 }
 
-/**
- * Bulk sync an array of bookings to Google Sheets (legacy)
- */
-async function syncAllBookingsToSheets(bookings) {
-  if (!isConfigured()) {
-    throw new Error('Google Sheets is not configured. Please add GOOGLE_SHEET_WEBHOOK_URL or GOOGLE_SERVICE_ACCOUNT_EMAIL in .env');
+// ---------------------------------------------------------------------
+// Legacy Handlers (preserved for backward compatibility)
+// ---------------------------------------------------------------------
+
+async function getMasterRowsByPhone(phone) {
+  if (!isConfigured()) return [];
+  try {
+    const rows = await store.findRows('users_master', 'phone', phone);
+    return rows.map((r) => (typeof r.toObject === 'function' ? r.toObject() : r));
+  } catch (err) {
+    return [];
   }
-  let count = 0;
-  for (const b of bookings) {
-    try {
-      await saveBookVehicleRow(b);
-      count++;
-    } catch (e) {
-      logger.warn(`Failed to sync booking ${b.user_id} to sheet:`, e.message);
-    }
+}
+
+async function saveMasterSession(row) {
+  if (!isConfigured()) return row;
+  return store.upsertRow('users_master', 'user_id', row);
+}
+
+async function getBookVehicleRow(userId) {
+  if (!isConfigured()) return {};
+  try {
+    const rows = await store.findRows('BookVehicle', 'user_id', userId);
+    return rows.length > 0 ? (typeof rows[0].toObject === 'function' ? rows[0].toObject() : rows[0]) : {};
+  } catch {
+    return {};
   }
-  return { syncedCount: count, total: bookings.length };
+}
+
+async function saveBookVehicleRow(row) {
+  if (!isConfigured()) return row;
+  return store.upsertRow('BookVehicle', 'user_id', row);
+}
+
+async function getProvideVehicleRow(userId) {
+  if (!isConfigured()) return {};
+  try {
+    const rows = await store.findRows('ProvideVehicle', 'user_id', userId);
+    return rows.length > 0 ? (typeof rows[0].toObject === 'function' ? rows[0].toObject() : rows[0]) : {};
+  } catch {
+    return {};
+  }
+}
+
+async function saveProvideVehicleRow(row) {
+  if (!isConfigured()) return row;
+  return store.upsertRow('ProvideVehicle', 'user_id', row);
+}
+
+async function getSupportRow(userId) {
+  if (!isConfigured()) return {};
+  try {
+    const rows = await store.findRows('Support', 'user_id', userId);
+    return rows.length > 0 ? (typeof rows[0].toObject === 'function' ? rows[0].toObject() : rows[0]) : {};
+  } catch {
+    return {};
+  }
+}
+
+async function saveSupportRow(row) {
+  if (!isConfigured()) return row;
+  return store.upsertRow('Support', 'user_id', row);
 }
 
 module.exports = {
   isConfigured,
   saveFuelTruckOrder,
+  getFuelRates,
+  getCustomerByPhone,
   saveCustomer,
   saveFuelRate,
   saveBotSession,
@@ -265,5 +221,4 @@ module.exports = {
   saveProvideVehicleRow,
   getSupportRow,
   saveSupportRow,
-  syncAllBookingsToSheets,
 };

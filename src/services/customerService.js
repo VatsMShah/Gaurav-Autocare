@@ -1,14 +1,11 @@
 /**
  * Customer Data Service for Gaurav Autocare
  * Handles lookup and extraction of customer details (name and phone).
- * Ready to be connected to further customer records, sheets, or APIs.
+ * Supports in-memory cache, Google Sheets, and Supabase.
  */
 
-// In-memory customer directory. Add/extend records as needed.
-const customerRegistry = {
-  // Example entries:
-  // '9876543210': { name: 'Rajesh Transport', phone: '+91 98765 43210', company: 'Rajesh Fleet' },
-};
+// In-memory customer directory
+const customerRegistry = {};
 
 /**
  * Normalizes phone number to last 10 digits for clean lookup
@@ -23,35 +20,49 @@ function normalizePhone(phone) {
  * Extract customer information by phone number and WhatsApp webhook context
  * @param {string} phone - Sender phone number from WhatsApp
  * @param {object} waMessagePayload - Meta webhook payload object (may include contacts array)
+ * @param {object|null} existingCustomer - Pre-fetched customer object from DB or Sheets
  * @returns {object} { name, phone, company, isRegistered }
  */
-function extractCustomerInfo(phone, waMessagePayload = {}) {
+function extractCustomerInfo(phone, waMessagePayload = {}, existingCustomer = null) {
   const normPhone = normalizePhone(phone);
+  const formattedPhone = phone ? (phone.startsWith('+') ? phone : `+${phone}`) : 'N/A';
 
-  // 1. Check local customer registry
+  // 1. Explicitly passed pre-fetched customer (e.g. from Sheets or Supabase)
+  if (existingCustomer && (existingCustomer.name || existingCustomer.company_name)) {
+    const cust = {
+      name: existingCustomer.name || existingCustomer.company_name || 'Valued Customer',
+      phone: existingCustomer.phone || formattedPhone,
+      company: existingCustomer.company_name || existingCustomer.company || '',
+      isRegistered: true,
+    };
+    if (normPhone) customerRegistry[normPhone] = cust;
+    return cust;
+  }
+
+  // 2. Check local customer registry
   if (normPhone && customerRegistry[normPhone]) {
     const reg = customerRegistry[normPhone];
     return {
       name: reg.name || 'Valued Customer',
-      phone: reg.phone || (phone.startsWith('+') ? phone : `+${phone}`),
+      phone: reg.phone || formattedPhone,
       company: reg.company || '',
       isRegistered: true,
     };
   }
 
-  // 2. Extract profile name provided by WhatsApp in webhook contacts
+  // 3. Extract profile name provided by WhatsApp in webhook contacts
   const contactProfileName = waMessagePayload.contacts?.[0]?.profile?.name;
 
   return {
     name: contactProfileName || 'Valued Customer',
-    phone: phone ? (phone.startsWith('+') ? phone : `+${phone}`) : 'N/A',
+    phone: formattedPhone,
     company: '',
     isRegistered: false,
   };
 }
 
 /**
- * Register or update customer records
+ * Register or update customer records in local memory
  * @param {Array|object} data - Array of customer objects or key-value object
  */
 function registerCustomers(data) {
@@ -62,7 +73,8 @@ function registerCustomers(data) {
         customerRegistry[key] = {
           name: item.name || item.customerName || 'Customer',
           phone: item.phone || item.mobile || key,
-          company: item.company || '',
+          company: item.company || item.company_name || '',
+          isRegistered: true,
         };
       }
     }
@@ -70,7 +82,10 @@ function registerCustomers(data) {
     for (const [key, val] of Object.entries(data)) {
       const norm = normalizePhone(key);
       if (norm) {
-        customerRegistry[norm] = typeof val === 'string' ? { name: val, phone: key } : val;
+        customerRegistry[norm] =
+          typeof val === 'string'
+            ? { name: val, phone: key, isRegistered: true }
+            : { ...val, isRegistered: true };
       }
     }
   }
@@ -80,7 +95,7 @@ function registerCustomers(data) {
  * Fetch and cache customer from Supabase if available
  */
 async function fetchCustomerFromDb(phone, supabaseClient) {
-  if (!supabaseClient) return null;
+  if (!supabaseClient || !phone) return null;
   try {
     const norm = normalizePhone(phone);
     const { data, error } = await supabaseClient
@@ -95,11 +110,12 @@ async function fetchCustomerFromDb(phone, supabaseClient) {
         name: data.name,
         phone: data.phone,
         company: data.company_name || '',
+        isRegistered: true,
       };
       return customerRegistry[norm];
     }
   } catch {
-    // Graceful fallback to local registry
+    // Graceful fallback
   }
   return null;
 }

@@ -4,6 +4,12 @@ const logger = require('../utils/logger');
 // In-memory session store so bot works without database setup
 const memorySessions = new Map();
 
+// Default fallback pump rates
+const DEFAULT_RATES = {
+  Diesel: 92.80,
+  Petrol: 104.50,
+};
+
 /**
  * Safely parse JSON string
  */
@@ -34,6 +40,10 @@ function generateOrderTicket({ ticketId, customer, orderDetails }) {
     ? `₹${Number(orderDetails.amount).toLocaleString('en-IN')}`
     : `₹${orderDetails.amount}`;
 
+  const rateDisplay = orderDetails.rate_per_litre
+    ? ` (₹${Number(orderDetails.rate_per_litre).toFixed(2)}/L)`
+    : '';
+
   return (
     `=================================\n` +
     `   🎫 *GAURAV AUTOCARE* ⛽\n` +
@@ -43,10 +53,11 @@ function generateOrderTicket({ ticketId, customer, orderDetails }) {
     `📅 *Date & Time:* ${dateTimeStr}\n\n` +
     `👤 *CUSTOMER DETAILS:*\n` +
     `• *Name:* ${customer.name}\n` +
-    `• *Mobile:* ${customer.phone}\n\n` +
+    `• *Mobile:* ${customer.phone}\n` +
+    (customer.company ? `• *Company:* ${customer.company}\n\n` : `\n`) +
     `🚛 *FUEL TRUCK ORDER DETAILS:*\n` +
     `• *Vehicle Number:* ${String(orderDetails.vehicle_number || '').toUpperCase()}\n` +
-    `• *Fuel Type:* ${orderDetails.fuel_type || 'Diesel'}\n` +
+    `• *Fuel Type:* ${orderDetails.fuel_type || 'Diesel'}${rateDisplay}\n` +
     `• *Quantity:* ${orderDetails.litres} Litres\n` +
     `• *Estimated Amount:* ${formattedAmount}\n\n` +
     `📊 *Status:* ✅ *CONFIRMED & SCHEDULED*\n` +
@@ -60,11 +71,16 @@ function generateOrderTicket({ ticketId, customer, orderDetails }) {
 /**
  * Generates the welcome message text asking for all 3 details in one go
  */
-function generateWelcomeMessage(customer) {
+function generateWelcomeMessage(customer, activeRates = DEFAULT_RATES) {
+  const dRate = (activeRates.Diesel || DEFAULT_RATES.Diesel).toFixed(2);
+  const pRate = (activeRates.Petrol || DEFAULT_RATES.Petrol).toFixed(2);
+
   return (
     `🙏 *Hii, Welcome to Gaurav Autocare* ⛽🚛\n\n` +
     `👤 *Customer Name:* ${customer.name}\n` +
-    `📱 *Mobile Number:* ${customer.phone}\n\n` +
+    `📱 *Mobile Number:* ${customer.phone}\n` +
+    (customer.company ? `🏢 *Company:* ${customer.company}\n\n` : `\n`) +
+    `⛽ *Today's Rates:* Diesel ₹${dRate}/L | Petrol ₹${pRate}/L\n\n` +
     `Please reply with your Fuel Truck order in this exact 3-line format:\n\n` +
     `*Vehicle Number*\n` +
     `*Diesel or Petrol*\n` +
@@ -81,18 +97,17 @@ function generateWelcomeMessage(customer) {
 }
 
 /**
- * Validates and parses user single-message input containing:
- * Line 1: Vehicle number
- * Line 2: Diesel or Petrol
- * Line 3: Quantity (Litres) OR Price (Rupees)
+ * Validates and parses user single-message input with dynamic daily rates
  */
-function validateAndParseFuelOrder(text) {
+function validateAndParseFuelOrder(text, activeRates = DEFAULT_RATES) {
   const clean = String(text || '').trim();
   const lower = clean.toLowerCase();
   const errors = [];
 
+  const dieselRate = parseFloat(activeRates.Diesel) || DEFAULT_RATES.Diesel;
+  const petrolRate = parseFloat(activeRates.Petrol) || DEFAULT_RATES.Petrol;
+
   // 1. Vehicle Number Validation
-  // Indian vehicle registration pattern (e.g. MH04XZ1212, MH05678, DL01AB1234, GJ01CD5678, etc.)
   const plateMatch = clean.match(/\b([A-Z]{2}[-\s]?[0-9]{1,2}[-\s]?[A-Z]{0,3}[-\s]?[0-9]{3,4})\b/i);
   let vehicleNumber = '';
   if (plateMatch) {
@@ -101,18 +116,18 @@ function validateAndParseFuelOrder(text) {
     errors.push('❌ *Vehicle Number Invalid:* Please provide a valid vehicle registration number (e.g. *MH04XZ1212* or *MH05678*).');
   }
 
-  // 2. Fuel Type Validation (Must explicitly be Petrol or Diesel)
+  // 2. Fuel Type Validation
   let fuelType = null;
-  let rate = 92.80;
+  let rate = dieselRate;
   const hasDiesel = /\b(diesel|hsd)\b/i.test(lower);
   const hasPetrol = /\b(petrol|ms)\b/i.test(lower);
 
   if (hasDiesel && !hasPetrol) {
     fuelType = 'Diesel';
-    rate = 92.80;
+    rate = dieselRate;
   } else if (hasPetrol && !hasDiesel) {
     fuelType = 'Petrol';
-    rate = 104.50;
+    rate = petrolRate;
   } else if (hasDiesel && hasPetrol) {
     errors.push('❌ *Conflicting Fuel Type:* Please choose only *Diesel* OR *Petrol*, not both.');
   } else {
@@ -120,12 +135,10 @@ function validateAndParseFuelOrder(text) {
   }
 
   // 3. Quantity (Litres) OR Price (Rupees) Validation
-  // Check for price explicitly: 2200 rupees, 2200 rs, rs 2200, 2200 inr, price 2200, ₹2200, etc.
   const amountMatch =
     clean.match(/(?:₹|rs\.?|inr|rupees|amount|price)\s*(\d[\d,]*)/i) ||
     clean.match(/(\d[\d,]*)\s*(?:rs|inr|rupees)/i);
 
-  // Check for litres explicitly: 1000 litres, 1000 ltr, 1000L, 1000 l, etc.
   const litresMatch = clean.match(/(\d[\d,]*)\s*(?:litres?|liters?|ltrs?|ltr|l)\b/i);
 
   let litres = 0;
@@ -141,7 +154,6 @@ function validateAndParseFuelOrder(text) {
     litres = parseInt(litresMatch[1].replace(/,/g, ''), 10);
     amount = Math.round(litres * rate);
   } else {
-    // Check if user entered a number without specifying Litres or Price (e.g. "2200" or "1000")
     let textWithoutPlate = clean;
     if (plateMatch) {
       textWithoutPlate = textWithoutPlate.replace(plateMatch[0], '');
@@ -180,24 +192,27 @@ function validateAndParseFuelOrder(text) {
       fuel_type: fuelType,
       litres: String(litres),
       amount: String(amount),
+      rate_per_litre: rate,
     },
   };
 }
 
 /**
  * Main conversation processor for Gaurav Autocare WhatsApp Bot.
- * Streamlined 3-text flow:
- * Text 1 (Bot): Welcome message with vehicle, petrol/diesel, litres/price prompt
- * Text 2 (User): User replies with details (e.g. MH04XZ1212, Diesel, 1000 Litres)
- * Text 3 (Bot): Bot sends confirmed Ticket (or recorrection message if invalid)
+ * @param {object} waMessagePayload - Meta incoming webhook payload
+ * @param {Array} masterRows - Previous session state row if any
+ * @param {object|null} currentRates - Live daily rates { Diesel, Petrol } from Sheets
+ * @param {object|null} preloadedCustomer - Customer info from Sheets/DB if resolved
  */
-function processConversation(waMessagePayload, masterRows = []) {
+function processConversation(waMessagePayload, masterRows = [], currentRates = null, preloadedCustomer = null) {
   const chat = waMessagePayload || {};
   const msg = chat.messages?.[0];
   const phone = msg?.from || 'unknown_user';
 
-  // 1. Extract customer name and number
-  const customer = extractCustomerInfo(phone, chat);
+  const activeRates = currentRates || DEFAULT_RATES;
+
+  // 1. Extract customer name and number (with preloaded customer support)
+  const customer = extractCustomerInfo(phone, chat, preloadedCustomer);
 
   // 2. Identify message type and content
   let textBody = '';
@@ -276,14 +291,16 @@ function processConversation(waMessagePayload, masterRows = []) {
   }
 
   // Retrieve previous session state
-  const previousSession = memorySessions.get(phone) || {};
+  const previousSession = (masterRows && masterRows[0]) || memorySessions.get(phone) || {};
   const currentState = isNewOrder ? 'initial' : previousSession.state || 'initial';
 
   // Case A: User completed the WhatsApp Flow Form (nfm_reply)
   if (flowResponse && (flowResponse.vehicle_number || flowResponse.fuel_type || flowResponse.litres || flowResponse.amount)) {
     const ticketId = `GA-${Date.now().toString().slice(-6)}`;
     const fuelType = (flowResponse.fuel_type || 'Diesel').trim();
-    const rate = fuelType.toLowerCase() === 'petrol' ? 104.50 : 92.80;
+    const rate = fuelType.toLowerCase() === 'petrol'
+      ? (activeRates.Petrol || DEFAULT_RATES.Petrol)
+      : (activeRates.Diesel || DEFAULT_RATES.Diesel);
 
     let litres = parseFloat(flowResponse.litres || '0') || 0;
     let amount = parseFloat(flowResponse.amount || '0') || 0;
@@ -302,6 +319,7 @@ function processConversation(waMessagePayload, masterRows = []) {
       fuel_type: fuelType,
       litres: String(litres),
       amount: String(amount),
+      rate_per_litre: rate,
     };
 
     const ticketText = generateOrderTicket({ ticketId, customer, orderDetails });
@@ -323,9 +341,9 @@ function processConversation(waMessagePayload, masterRows = []) {
     };
   }
 
-  // Text 1 (Bot): User sends Hi or starts conversation or clicks Order Another -> Send Welcome Text with exact 3-line format
+  // Text 1 (Bot): User sends Hi or clicks Order Another -> Send Welcome Text
   if (currentState === 'initial' || isNewOrder) {
-    const welcomeText = generateWelcomeMessage(customer);
+    const welcomeText = generateWelcomeMessage(customer, activeRates);
 
     memorySessions.set(phone, {
       state: 'awaiting_details',
@@ -347,7 +365,7 @@ function processConversation(waMessagePayload, masterRows = []) {
 
   // Text 2 (User sends details) -> Validate!
   if (currentState === 'awaiting_details' || currentState === 'order_confirmed') {
-    const validation = validateAndParseFuelOrder(textBody);
+    const validation = validateAndParseFuelOrder(textBody, activeRates);
 
     // If validation fails -> Send recorrection message!
     if (!validation.isValid) {
@@ -402,7 +420,7 @@ function processConversation(waMessagePayload, masterRows = []) {
     customer,
     state: 'awaiting_details',
     action: 'send_welcome',
-    response: generateWelcomeMessage(customer),
+    response: generateWelcomeMessage(customer, activeRates),
     updated_at: new Date().toISOString(),
   };
 }
@@ -413,4 +431,5 @@ module.exports = {
   generateWelcomeMessage,
   validateAndParseFuelOrder,
   memorySessions,
+  DEFAULT_RATES,
 };

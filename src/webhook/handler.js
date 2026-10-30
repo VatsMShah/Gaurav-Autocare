@@ -6,9 +6,7 @@ const whatsapp = require('../services/whatsapp');
 const logger = require('../utils/logger');
 
 /**
- * Safely parses the JSON `data` blob stored on the master row / process
- * output. Mirrors the `JSON.parse(x || "{}")` pattern used throughout the
- * original n8n expressions.
+ * Safely parses the JSON `data` blob
  */
 function safeParseData(jsonString) {
   try {
@@ -18,15 +16,12 @@ function safeParseData(jsonString) {
   }
 }
 
-/**
- * Equivalent of "BookVehicleGetRows" -> "BookVehicleAppendUpdateRow".
- * Each field prefers the freshly-collected value from this turn's `data`,
- * falling back to whatever was already in the BookVehicle sheet row.
- */
+// ---------------------------------------------------------------------
+// Legacy Handlers (preserved for backward compatibility)
+// ---------------------------------------------------------------------
 async function persistBookVehicle(output) {
   const data = safeParseData(output.data);
   const existing = await db.getBookVehicleRow(output.user_id);
-
   const row = {
     user_id: output.user_id,
     state: output.state,
@@ -61,23 +56,12 @@ async function persistBookVehicle(output) {
     remarks: data.remarks || existing.remarks || '',
     weight: data.weight || existing.weight || '',
   };
-
   await db.saveBookVehicleRow(row);
 }
 
-/**
- * Equivalent of "ProvideVehicleGetRows" -> "ProvideVehicleAppendUpdateRow1".
- *
- * NOTE: the original n8n node mapped the "notes" column from
- * `provider_capacity` instead of `provider_notes` — almost certainly a
- * copy-paste bug in the source workflow. We replicate it as-is here for
- * exact functional parity; flip the line below to `data.provider_notes`
- * once you've confirmed with the business which behavior is correct.
- */
 async function persistProvideVehicle(output) {
   const data = safeParseData(output.data);
   const existing = await db.getProvideVehicleRow(output.user_id);
-
   const row = {
     user_id: output.user_id,
     state: output.state,
@@ -90,15 +74,12 @@ async function persistProvideVehicle(output) {
     availability: data.provider_availability || existing.availability || '',
     driverPhone: data.provider_driverPhone || existing.driverPhone || '',
     currentLocation: data.provider_currentLocation || existing.currentLocation || '',
-    // Replicated from original workflow — see NOTE above.
     notes: data.provider_capacity || existing.notes || '',
     documents: data.provider_documents || existing.documents || '',
   };
-
   await db.saveProvideVehicleRow(row);
 }
 
-/** Equivalent of "SupportGetRows" -> "SupportAppendUpdateRow". */
 async function persistSupport(output) {
   await db.saveSupportRow({
     user_id: output.user_id,
@@ -106,28 +87,9 @@ async function persistSupport(output) {
   });
 }
 
-/**
- * Equivalent of the n8n "Switch" node (branch on flowType) feeding into
- * the per-flow sheet + the shared "Send message1-summary" node.
- */
-async function persistToFlowSheet(output) {
-  switch (output.flowType) {
-    case 'book':
-      // Only persist to book_vehicle if the order is completed (state === 'cta_menu')
-      // Partial/in-progress chats remain in users_master (Live Bot Sessions)
-      if (output.state === 'cta_menu') {
-        return persistBookVehicle(output);
-      }
-      return null;
-    case 'provider':
-      return persistProvideVehicle(output);
-    case 'support':
-      return persistSupport(output);
-    default:
-      // Matches the Switch node's fallback output — no sheet write, just send the reply.
-      return null;
-  }
-}
+// ---------------------------------------------------------------------
+// ACTIVE GAURAV AUTOCARE WEBHOOK CONTROLLER
+// ---------------------------------------------------------------------
 
 /**
  * Main entrypoint — handles incoming WhatsApp messages and interactive Flow submissions
@@ -144,7 +106,23 @@ async function handleIncomingMessage(value) {
 
   const phone = value.messages[0]?.from;
 
-  // Safe database fetch (if Supabase credentials are configured; otherwise fallback gracefully)
+  // 1. Fetch live fuel rates (reads Google Sheet first, falls back to Supabase/defaults)
+  let activeRates = null;
+  try {
+    activeRates = await sheets.getFuelRates();
+  } catch (rateErr) {
+    logger.debug('Rates fetch fallback: ' + rateErr.message);
+  }
+
+  // 2. Look up customer profile (reads Google Sheet first, then Supabase)
+  let preloadedCustomer = null;
+  try {
+    preloadedCustomer = await sheets.getCustomerByPhone(phone);
+  } catch (custErr) {
+    logger.debug('Sheet customer lookup fallback: ' + custErr.message);
+  }
+
+  // 3. Safe database session fetch
   let sessionRecord = null;
   try {
     if (phone && config.supabase?.key && !config.supabase.key.startsWith('your_')) {
@@ -155,58 +133,78 @@ async function handleIncomingMessage(value) {
         .eq('phone', phone)
         .maybeSingle();
       sessionRecord = data;
+
+      // If customer not yet resolved from sheets, try Supabase
+      if (!preloadedCustomer) {
+        const { data: dbCust } = await client
+          .from('customers')
+          .select('*')
+          .ilike('phone', `%${phone.replace(/\D/g, '').slice(-10)}%`)
+          .maybeSingle();
+        if (dbCust) preloadedCustomer = dbCust;
+      }
     }
   } catch (dbErr) {
     logger.debug('Bot session fetch info: ' + dbErr.message);
   }
 
-  // Process Conversation & State Machine
-  const output = processConversation(value, sessionRecord ? [sessionRecord] : []);
+  // 4. Process Conversation & State Machine with dynamic rates and resolved customer
+  const output = processConversation(
+    value,
+    sessionRecord ? [sessionRecord] : [],
+    activeRates,
+    preloadedCustomer
+  );
 
-  // Safe database persist (if configured)
-  try {
-    if (config.supabase?.key && !config.supabase.key.startsWith('your_')) {
-      const sessionData = {
-        customer: output.customer,
-        orderDetails: output.orderDetails,
-      };
-      await db.upsertBotSession(output.phone, output.state, sessionData);
+  const sessionData = {
+    customer: output.customer,
+    orderDetails: output.orderDetails,
+  };
 
-      if (sheets.isConfigured()) {
-        sheets.saveBotSession(output.phone, output.state, sessionData).catch((e) =>
-          logger.warn('Google Sheet session sync error:', e.message)
-        );
+  const parsedSession = safeParseData(output.data);
+  const orderRecord = output.action === 'send_ticket' && output.orderDetails
+    ? {
+        ticketId: parsedSession.ticketId,
+        customerName: output.customer?.name,
+        phone: output.phone,
+        vehicleNumber: output.orderDetails.vehicle_number,
+        fuelType: output.orderDetails.fuel_type,
+        litres: output.orderDetails.litres,
+        amount: output.orderDetails.amount,
+        ratePerLitre: output.orderDetails.rate_per_litre,
+        orderStatus: 'Confirmed',
+        paymentStatus: 'Pending',
+        source: output.flowType === 'whatsapp_flow' ? 'whatsapp_flow' : 'whatsapp_bot',
       }
+    : null;
 
-      // If user placed a fuel truck order, save to fuel_truck_orders table
-      if (output.action === 'send_ticket' && output.orderDetails) {
-        const parsedSession = JSON.parse(output.data || '{}');
-        const orderRecord = {
-          ticketId: parsedSession.ticketId,
-          customerName: output.customer?.name,
-          phone: output.phone,
-          vehicleNumber: output.orderDetails.vehicle_number,
-          fuelType: output.orderDetails.fuel_type,
-          litres: output.orderDetails.litres,
-          amount: output.orderDetails.amount,
-          orderStatus: 'confirmed',
-          paymentStatus: 'pending',
-        };
-        await db.saveFuelTruckOrder(orderRecord);
-
-        // Mirror order to Google Sheets
-        if (sheets.isConfigured()) {
-          sheets.saveFuelTruckOrder(orderRecord).catch((e) =>
-            logger.warn('Google Sheet order sync error:', e.message)
-          );
-        }
+  // 5. PRIMARY PERSISTENCE: Google Sheets (Runs independently of Supabase)
+  if (sheets.isConfigured()) {
+    try {
+      await sheets.saveBotSession(output.phone, output.state, sessionData);
+      if (orderRecord) {
+        await sheets.saveFuelTruckOrder(orderRecord);
+        logger.info(`✅ Order #${orderRecord.ticketId} saved to Google Sheet`);
       }
+    } catch (sheetErr) {
+      logger.warn('Google Sheet persist error:', sheetErr.message);
     }
-  } catch (persistErr) {
-    logger.info('Database persist skipped: ' + persistErr.message);
   }
 
-  // Handle Response / Flow Action
+  // 6. SECONDARY PERSISTENCE: Supabase (Runs independently)
+  if (config.supabase?.key && !config.supabase.key.startsWith('your_')) {
+    try {
+      await db.upsertBotSession(output.phone, output.state, sessionData);
+      if (orderRecord) {
+        await db.saveFuelTruckOrder(orderRecord);
+        logger.info(`✅ Order #${orderRecord.ticketId} saved to Supabase`);
+      }
+    } catch (dbErr) {
+      logger.warn('Supabase persist error:', dbErr.message);
+    }
+  }
+
+  // 7. Dispatch WhatsApp Outbound Response / Action
   const hasValidFlowId =
     Boolean(config.whatsapp.flowId) &&
     config.whatsapp.flowId !== 'your_flow_id_here' &&
@@ -280,4 +278,9 @@ async function handleIncomingMessage(value) {
   });
 }
 
-module.exports = { handleIncomingMessage };
+module.exports = {
+  handleIncomingMessage,
+  persistBookVehicle,
+  persistProvideVehicle,
+  persistSupport,
+};
