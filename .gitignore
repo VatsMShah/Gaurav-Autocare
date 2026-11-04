@@ -6,3 +6,4 @@ supabase/.temp/
 data/
 .github/
 cloudflared
+auth_baileys/

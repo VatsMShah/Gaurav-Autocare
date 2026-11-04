@@ -368,7 +368,8 @@ function doPost(e) {
       var custSheet = ss.getSheetByName('customers');
       var customer = null;
       if (custSheet && custSheet.getLastRow() > 1) {
-        var cData = custSheet.getRange(2, 1, custSheet.getLastRow() - 1, 5).getValues();
+        var numCols = Math.max(custSheet.getLastColumn(), 5);
+        var cData = custSheet.getRange(2, 1, custSheet.getLastRow() - 1, numCols).getValues();
         for (var j = 0; j < cData.length; j++) {
           var rowPhone = String(cData[j][0] || '').replace(/\D/g, '').slice(-10);
           if (rowPhone && rowPhone === searchPhone) {
@@ -377,7 +378,8 @@ function doPost(e) {
               name: String(cData[j][1] || ''),
               company_name: String(cData[j][2] || ''),
               email: String(cData[j][3] || ''),
-              gstin: String(cData[j][4] || '')
+              gstin: String(cData[j][4] || ''),
+              group_ids: String(cData[j][7] || cData[j][5] || '')
             };
             break;
           }

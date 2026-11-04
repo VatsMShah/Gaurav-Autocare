@@ -212,6 +212,36 @@ async function sendInteractiveList(to, headerText, bodyText, footerText, buttonL
   return callGraphApi(payload);
 }
 
+/**
+ * Marks incoming message as read (Blue Tick) and triggers the "typing..." animation.
+ * @param {string} messageId - The wamid ID of the received user message
+ */
+async function markAsReadAndTyping(messageId) {
+  if (!messageId) return null;
+  try {
+    return await callGraphApi({
+      messaging_product: 'whatsapp',
+      status: 'read',
+      message_id: messageId,
+      typing_indicator: {
+        type: 'text',
+      },
+    });
+  } catch (err) {
+    logger.debug('Typing indicator call note: ' + err.message);
+    try {
+      return await callGraphApi({
+        messaging_product: 'whatsapp',
+        status: 'read',
+        message_id: messageId,
+      });
+    } catch (fallbackErr) {
+      logger.debug('Mark as read fallback note: ' + fallbackErr.message);
+      return null;
+    }
+  }
+}
+
 module.exports = {
   sendText,
   sendCtaButtons,
@@ -219,4 +249,5 @@ module.exports = {
   sendFuelOrderFlow,
   sendInteractiveButtons,
   sendInteractiveList,
+  markAsReadAndTyping,
 };

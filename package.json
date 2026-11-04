@@ -18,9 +18,12 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.0",
+    "@whiskeysockets/baileys": "^7.0.0-rc14",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "google-auth-library": "^9.14.1",
-    "google-spreadsheet": "^4.1.4"
+    "google-spreadsheet": "^4.1.4",
+    "pino": "^10.4.0",
+    "qrcode": "^1.5.4"
   }
 }

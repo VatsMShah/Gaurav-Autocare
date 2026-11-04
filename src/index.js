@@ -3,6 +3,7 @@ const config = require('./config');
 const logger = require('./utils/logger');
 const { handleVerification, isValidSignature } = require('./webhook/verify');
 const { handleIncomingMessage } = require('./webhook/handler');
+const groupBridge = require('./services/groupBridge');
 
 const app = express();
 
@@ -79,6 +80,132 @@ app.get('/data-deletion', (_req, res) => {
   `);
 });
 
+// WhatsApp Group Bridge - QR Code Page for Linking Device
+app.get('/qr', (_req, res) => {
+  const status = groupBridge.getStatus();
+
+  if (status.isConnected) {
+    return res.send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Gaurav Autocare - WhatsApp Bridge Active</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #0f172a; color: #f8fafc; }
+          .card { background: #1e293b; padding: 2.5rem; border-radius: 1rem; box-shadow: 0 10px 25px rgba(0,0,0,0.3); text-align: center; max-width: 460px; width: 90%; }
+          .badge { display: inline-block; padding: 0.35rem 0.85rem; border-radius: 9999px; background: #10b981; color: white; font-weight: bold; font-size: 0.85rem; margin-bottom: 1rem; }
+          h1 { margin: 0 0 0.5rem; font-size: 1.5rem; }
+          p { color: #94a3b8; font-size: 0.95rem; line-height: 1.5; }
+          .info-box { background: #0f172a; border-radius: 0.5rem; padding: 0.85rem; margin: 1.25rem 0; font-family: monospace; color: #38bdf8; font-size: 0.9rem; word-break: break-all; }
+          .btn { display: inline-block; margin-top: 1rem; padding: 0.75rem 1.5rem; background: #2563eb; color: white; text-decoration: none; border-radius: 0.5rem; font-weight: 500; font-size: 0.95rem; }
+          .btn:hover { background: #1d4ed8; }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <div class="badge">● CONNECTED</div>
+          <h1>WhatsApp Group Bridge is Active</h1>
+          <p>This phone number is now linked to post fuel order confirmations to your client WhatsApp groups for <strong>₹0.00</strong>!</p>
+          <div class="info-box">Logged in ID: ${status.connectedUser || 'Connected'}</div>
+          <a href="/groups" class="btn">View All Joined Groups</a>
+        </div>
+      </body>
+      </html>
+    `);
+  }
+
+  if (!status.hasQr) {
+    return res.send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Gaurav Autocare - Initializing Bridge...</title>
+        <meta http-equiv="refresh" content="3">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #0f172a; color: #f8fafc; text-align: center; }
+        </style>
+      </head>
+      <body>
+        <div>
+          <h2>🔄 Initializing WhatsApp Bridge...</h2>
+          <p style="color: #94a3b8;">Generating QR code. Auto-refreshing in 3 seconds...</p>
+        </div>
+      </body>
+      </html>
+    `);
+  }
+
+  res.send(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Gaurav Autocare - Link WhatsApp Bridge</title>
+      <meta name="viewport" content="width=device-width, initial-scale=1">
+      <meta http-equiv="refresh" content="20">
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #0f172a; color: #f8fafc; }
+        .card { background: #1e293b; padding: 2rem; border-radius: 1rem; box-shadow: 0 10px 25px rgba(0,0,0,0.3); text-align: center; max-width: 440px; width: 90%; }
+        h1 { margin: 0 0 0.5rem; font-size: 1.4rem; }
+        p { color: #94a3b8; font-size: 0.9rem; line-height: 1.5; margin-bottom: 1.25rem; }
+        .qr-box { background: white; padding: 1rem; border-radius: 0.75rem; display: inline-block; margin-bottom: 1rem; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+        .qr-box img { display: block; max-width: 250px; height: auto; }
+        ol { text-align: left; color: #cbd5e1; font-size: 0.85rem; padding-left: 1.25rem; margin: 1rem 0; line-height: 1.6; }
+      </style>
+    </head>
+    <body>
+      <div class="card">
+        <h1>Link WhatsApp Group Bridge</h1>
+        <p>Scan with WhatsApp to dispatch fuel order tickets directly to client WhatsApp groups for ₹0.</p>
+        <div class="qr-box">
+          <img src="${status.qrDataUrl}" alt="WhatsApp QR Code" />
+        </div>
+        <ol>
+          <li>Open <strong>WhatsApp</strong> on your phone</li>
+          <li>Tap <strong>Settings / ⋮ Menu</strong> &gt; <strong>Linked Devices</strong></li>
+          <li>Tap <strong>Link a Device</strong> and point your camera at this QR</li>
+        </ol>
+        <small style="color: #64748b;">Page refreshes every 20 seconds</small>
+      </div>
+    </body>
+    </html>
+  `);
+});
+
+// Endpoint to view all groups the bridge number is currently added to
+app.get('/groups', async (_req, res) => {
+  try {
+    const groups = await groupBridge.getGroups();
+    res.json({
+      success: true,
+      count: groups.length,
+      groups,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Bridge status endpoint
+app.get('/bridge-status', (_req, res) => {
+  res.json(groupBridge.getStatus());
+});
+
+// Manual test endpoint to trigger a test group notification
+app.post('/test-group-send', async (req, res) => {
+  const { groupId, message } = req.body || {};
+  if (!groupId || !message) {
+    return res.status(400).json({ error: 'Please provide groupId and message in JSON body' });
+  }
+  try {
+    await groupBridge.sendGroupMessage(groupId, message);
+    res.json({ success: true, message: `Dispatched to group ${groupId}` });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // Meta's webhook verification handshake.
 app.get('/webhook', handleVerification);
 
@@ -125,4 +252,10 @@ app.post('/webhook', async (req, res) => {
 app.listen(config.port, () => {
   logger.info(`Gaurav Autocare WhatsApp bot listening on port ${config.port}`);
   logger.info(`Webhook URL (local): http://localhost:${config.port}/webhook`);
+  logger.info(`WhatsApp Group Bridge QR page: http://localhost:${config.port}/qr`);
+
+  // Initialize the WhatsApp Web Group Bridge
+  groupBridge.init().catch((err) => {
+    logger.error('Failed to initialize Group Bridge on startup:', err);
+  });
 });

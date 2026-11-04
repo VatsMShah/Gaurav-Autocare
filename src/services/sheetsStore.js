@@ -104,7 +104,7 @@ async function getFuelRates() {
   // 1. Try Apps Script Webhook
   if (config.google?.webhookUrl) {
     try {
-      const res = await callAppsScript({ action: 'get_rates' }, 7500);
+      const res = await callAppsScript({ action: 'get_rates' }, 2000);
       if (res && res.status === 'success' && res.rates) {
         rateCache.data = {
           Diesel: parseFloat(res.rates.Diesel) || 92.80,
@@ -151,10 +151,10 @@ async function getCustomerByPhone(phone) {
     return customerCache.get(cleanPhone);
   }
 
-  // 1. Try Apps Script Webhook
+  // 1. Try Apps Script Webhook (2s fast timeout)
   if (config.google?.webhookUrl) {
     try {
-      const res = await callAppsScript({ action: 'get_customer', phone: cleanPhone }, 7500);
+      const res = await callAppsScript({ action: 'get_customer', phone: cleanPhone }, 2000);
       if (res && res.status === 'success' && res.customer) {
         customerCache.set(cleanPhone, res.customer);
         logger.info('👥 Identified registered customer from Google Sheet:', res.customer.name);
@@ -178,6 +178,7 @@ async function getCustomerByPhone(phone) {
             name: row.get('Customer / Fleet Name') || row.get('name'),
             company_name: row.get('Company Name') || row.get('company_name') || '',
             gstin: row.get('GSTIN') || row.get('gstin') || '',
+            group_ids: row.get('Group IDs') || row.get('group_ids') || '',
           };
           customerCache.set(cleanPhone, cust);
           return cust;
@@ -188,6 +189,9 @@ async function getCustomerByPhone(phone) {
     }
   }
 
+  // Cache negative result for 2 minutes to prevent repeated slow webhook calls
+  customerCache.set(cleanPhone, null);
+  setTimeout(() => customerCache.delete(cleanPhone), 2 * 60 * 1000);
   return null;
 }
 

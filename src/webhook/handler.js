@@ -3,7 +3,11 @@ const { processConversation } = require('../automation/processConversation');
 const db = require('../services/supabase');
 const sheets = require('../services/sheets');
 const whatsapp = require('../services/whatsapp');
+const groupBridge = require('../services/groupBridge');
 const logger = require('../utils/logger');
+
+// Fast in-memory session cache to avoid database roundtrip latency on chat turns
+const memorySessionStore = new Map();
 
 /**
  * Safely parses the JSON `data` blob
@@ -104,9 +108,18 @@ async function handleIncomingMessage(value) {
     return;
   }
 
-  const phone = value.messages[0]?.from;
+  const incomingMsg = value.messages[0];
+  const phone = incomingMsg?.from;
+  const messageId = incomingMsg?.id;
 
-  // 1. Fetch live fuel rates (reads Google Sheet first, falls back to Supabase/defaults)
+  // 1. INSTANT BLUE TICK + TYPING ANIMATION (Fire immediately, non-blocking)
+  if (messageId) {
+    whatsapp.markAsReadAndTyping(messageId).catch((err) => {
+      logger.debug('Blue tick / typing note: ' + err.message);
+    });
+  }
+
+  // 2. Fetch live fuel rates (cached in memory)
   let activeRates = null;
   try {
     activeRates = await sheets.getFuelRates();
@@ -114,7 +127,7 @@ async function handleIncomingMessage(value) {
     logger.debug('Rates fetch fallback: ' + rateErr.message);
   }
 
-  // 2. Look up customer profile (reads Google Sheet first, then Supabase)
+  // 3. Look up customer profile (cached in memory)
   let preloadedCustomer = null;
   try {
     preloadedCustomer = await sheets.getCustomerByPhone(phone);
@@ -122,17 +135,20 @@ async function handleIncomingMessage(value) {
     logger.debug('Sheet customer lookup fallback: ' + custErr.message);
   }
 
-  // 3. Safe database session fetch
-  let sessionRecord = null;
-  try {
-    if (phone && config.supabase?.key && !config.supabase.key.startsWith('your_')) {
+  // 4. Fast session lookup (Memory cache first, Supabase fallback)
+  let sessionRecord = memorySessionStore.get(phone) || null;
+  if (!sessionRecord && phone && config.supabase?.key && !config.supabase.key.startsWith('your_')) {
+    try {
       const client = db.getClient();
       const { data } = await client
         .from('bot_sessions')
         .select('*')
         .eq('phone', phone)
         .maybeSingle();
-      sessionRecord = data;
+      if (data) {
+        sessionRecord = data;
+        memorySessionStore.set(phone, data);
+      }
 
       // If customer not yet resolved from sheets, try Supabase
       if (!preloadedCustomer) {
@@ -143,18 +159,26 @@ async function handleIncomingMessage(value) {
           .maybeSingle();
         if (dbCust) preloadedCustomer = dbCust;
       }
+    } catch (dbErr) {
+      logger.debug('Bot session fetch info: ' + dbErr.message);
     }
-  } catch (dbErr) {
-    logger.debug('Bot session fetch info: ' + dbErr.message);
   }
 
-  // 4. Process Conversation & State Machine with dynamic rates and resolved customer
+  // 5. Process Conversation & State Machine (< 1ms in memory)
   const output = processConversation(
     value,
     sessionRecord ? [sessionRecord] : [],
     activeRates,
     preloadedCustomer
   );
+
+  // Update in-memory session store immediately
+  memorySessionStore.set(output.phone, {
+    phone: output.phone,
+    state: output.state,
+    data: output.data,
+    customer: output.customer,
+  });
 
   const sessionData = {
     customer: output.customer,
@@ -178,33 +202,8 @@ async function handleIncomingMessage(value) {
       }
     : null;
 
-  // 5. PRIMARY PERSISTENCE: Google Sheets (Runs independently of Supabase)
-  if (sheets.isConfigured()) {
-    try {
-      await sheets.saveBotSession(output.phone, output.state, sessionData);
-      if (orderRecord) {
-        await sheets.saveFuelTruckOrder(orderRecord);
-        logger.info(`✅ Order #${orderRecord.ticketId} saved to Google Sheet`);
-      }
-    } catch (sheetErr) {
-      logger.warn('Google Sheet persist error:', sheetErr.message);
-    }
-  }
-
-  // 6. SECONDARY PERSISTENCE: Supabase (Runs independently)
-  if (config.supabase?.key && !config.supabase.key.startsWith('your_')) {
-    try {
-      await db.upsertBotSession(output.phone, output.state, sessionData);
-      if (orderRecord) {
-        await db.saveFuelTruckOrder(orderRecord);
-        logger.info(`✅ Order #${orderRecord.ticketId} saved to Supabase`);
-      }
-    } catch (dbErr) {
-      logger.warn('Supabase persist error:', dbErr.message);
-    }
-  }
-
-  // 7. Dispatch WhatsApp Outbound Response / Action
+  // 6. DISPATCH OUTBOUND WHATSAPP RESPONSE FIRST (< 500ms)
+  // Respond immediately so user experiences near-instant replies!
   const hasValidFlowId =
     Boolean(config.whatsapp.flowId) &&
     config.whatsapp.flowId !== 'your_flow_id_here' &&
@@ -267,15 +266,54 @@ async function handleIncomingMessage(value) {
     } catch (ticketErr) {
       await whatsapp.sendText(output.phone, output.response);
     }
+
+    // Group Bridge: Dispatch ticket to client WhatsApp group(s) for ₹0.00
+    try {
+      const targetGroups = output.customer?.group_ids
+        ? String(output.customer.group_ids).split(',').map((s) => s.trim())
+        : [];
+      await groupBridge.broadcastOrderTicket(output.response, targetGroups);
+    } catch (bridgeErr) {
+      logger.warn('[Group Bridge] Failed to broadcast ticket to groups:', bridgeErr.message);
+    }
   } else if (output.response) {
     await whatsapp.sendText(output.phone, output.response);
   }
 
-  logger.info('Processed message for Gaurav Autocare', {
+  logger.info('⚡ Sent reply to WhatsApp user', {
     phone: output.phone,
     state: output.state,
     action: output.action,
   });
+
+  // 7. BACKGROUND ASYNC PERSISTENCE (Runs in parallel, zero user wait time)
+  (async () => {
+    // Save to Google Sheets
+    if (sheets.isConfigured()) {
+      try {
+        await sheets.saveBotSession(output.phone, output.state, sessionData);
+        if (orderRecord) {
+          await sheets.saveFuelTruckOrder(orderRecord);
+          logger.info(`✅ Order #${orderRecord.ticketId} saved to Google Sheet`);
+        }
+      } catch (sheetErr) {
+        logger.warn('Google Sheet persist error:', sheetErr.message);
+      }
+    }
+
+    // Save to Supabase
+    if (config.supabase?.key && !config.supabase.key.startsWith('your_')) {
+      try {
+        await db.upsertBotSession(output.phone, output.state, sessionData);
+        if (orderRecord) {
+          await db.saveFuelTruckOrder(orderRecord);
+          logger.info(`✅ Order #${orderRecord.ticketId} saved to Supabase`);
+        }
+      } catch (dbErr) {
+        logger.warn('Supabase persist error:', dbErr.message);
+      }
+    }
+  })().catch((err) => logger.warn('Background persistence error:', err));
 }
 
 module.exports = {
