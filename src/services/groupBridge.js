@@ -108,6 +108,38 @@ class GroupBridge {
   }
 
   /**
+   * Log out current session and reset auth state to allow scanning a new phone.
+   */
+  async logout() {
+    logger.info('🔌 [Group Bridge] Logging out current WhatsApp session...');
+    try {
+      if (this.sock) {
+        await this.sock.logout().catch(() => {});
+        this.sock.end(undefined);
+      }
+    } catch (err) {
+      logger.debug('Logout error: ' + err.message);
+    }
+
+    try {
+      fs.rmSync(this.authDir, { recursive: true, force: true });
+    } catch (rmErr) {
+      logger.warn('Failed to delete auth dir on logout: ' + rmErr.message);
+    }
+
+    this.sock = null;
+    this.connectedUser = null;
+    this.connectionStatus = 'disconnected';
+    this.qrRaw = null;
+    this.qrDataUrl = null;
+    this.isInitializing = false;
+    clearTimeout(this.reconnectTimeout);
+
+    // Immediately trigger init to generate new QR
+    await this.init();
+  }
+
+  /**
    * Fetch all groups the connected WhatsApp number is a member of.
    */
   async getGroups() {

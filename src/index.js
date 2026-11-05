@@ -1,3 +1,9 @@
+const dns = require('dns');
+// Ensure IPv4 first to avoid macOS IPv6 connection timeouts on Google/Meta APIs
+if (dns.setDefaultResultOrder) {
+  dns.setDefaultResultOrder('ipv4first');
+}
+
 const express = require('express');
 const config = require('./config');
 const logger = require('./utils/logger');
@@ -108,7 +114,10 @@ app.get('/qr', (_req, res) => {
           <h1>WhatsApp Group Bridge is Active</h1>
           <p>This phone number is now linked to post fuel order confirmations to your client WhatsApp groups for <strong>₹0.00</strong>!</p>
           <div class="info-box">Logged in ID: ${status.connectedUser || 'Connected'}</div>
-          <a href="/groups" class="btn">View All Joined Groups</a>
+          <div style="display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap;">
+            <a href="/groups" class="btn">View All Joined Groups</a>
+            <a href="/logout" class="btn" style="background: #dc2626;" onclick="return confirm('Disconnect this number and scan a new QR code?')">Disconnect & Scan New Number</a>
+          </div>
         </div>
       </body>
       </html>
@@ -190,6 +199,16 @@ app.get('/groups', async (_req, res) => {
 // Bridge status endpoint
 app.get('/bridge-status', (_req, res) => {
   res.json(groupBridge.getStatus());
+});
+
+// Logout endpoint to clear session and re-generate QR code
+app.get('/logout', async (_req, res) => {
+  try {
+    await groupBridge.logout();
+    res.redirect('/qr');
+  } catch (err) {
+    res.status(500).send('Logout failed: ' + err.message);
+  }
 });
 
 // Manual test endpoint to trigger a test group notification
