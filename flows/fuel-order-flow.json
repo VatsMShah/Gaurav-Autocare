@@ -3,16 +3,16 @@
   "screens": [
     {
       "id": "FUEL_ORDER_FORM",
-      "title": "Fuel Truck Order",
+      "title": "Gaurav Auto Care Fuel Order",
       "terminal": true,
       "data": {
-        "customer_name": {
+        "company_name": {
           "type": "string",
-          "__example__": "Gaurav Sharma"
+          "__example__": "Sheetal Parivahan"
         },
-        "customer_phone": {
+        "manager_phone": {
           "type": "string",
-          "__example__": "+91 9876543210"
+          "__example__": "+91 9820500159"
         }
       },
       "layout": {
@@ -20,70 +20,1590 @@
         "children": [
           {
             "type": "TextHeading",
-            "text": "⛽ Gaurav Autocare"
+            "text": "Gaurav Auto Care"
           },
           {
             "type": "TextSubheading",
-            "text": "Fuel Truck Order Form"
+            "text": "Commercial Fuel Booking Form"
           },
           {
-            "type": "TextBody",
-            "text": "Please provide your fuel truck details below to place an instant order:"
+            "type": "TextCaption",
+            "text": "Fleet Partner: Sheetal Parivahan | Fill dispatch details below:"
           },
           {
-            "type": "TextInput",
-            "name": "vehicle_number",
-            "label": "Vehicle Number",
-            "required": true,
-            "input-type": "text",
-            "helper-text": "e.g. MH04AB1234 or GJ01CD5678"
-          },
-          {
-            "type": "RadioButtonsGroup",
-            "name": "fuel_type",
-            "label": "Select Fuel Type",
+            "type": "Dropdown",
+            "name": "vehicle_series",
+            "label": "Q1a. Vehicle Series",
             "required": true,
             "data-source": [
               {
-                "id": "Petrol",
-                "title": "Petrol (MS - Motor Spirit)"
+                "id": "ly",
+                "title": "MH04 LY Series (42 Trucks)"
               },
               {
-                "id": "Diesel",
-                "title": "Diesel (HSD - High Speed Diesel)"
+                "id": "ju",
+                "title": "MH04 JU Series (39 Trucks)"
+              },
+              {
+                "id": "le",
+                "title": "MH04 LE Series (34 Trucks)"
+              },
+              {
+                "id": "lq",
+                "title": "MH04 LQ Series (29 Trucks)"
+              },
+              {
+                "id": "kf",
+                "title": "MH04 KF Series (25 Trucks)"
+              },
+              {
+                "id": "mr",
+                "title": "MH04 MR Series (23 Trucks)"
+              },
+              {
+                "id": "mh",
+                "title": "MH04 MH Series (23 Trucks)"
+              },
+              {
+                "id": "ku",
+                "title": "MH04 KU Series (12 Trucks)"
+              },
+              {
+                "id": "other",
+                "title": "Other Series (JK, HD, HS, HY, NB - 17 Trucks)"
               }
             ]
           },
           {
-            "type": "TextCaption",
-            "text": "💡 Enter either Quantity (Litres) OR Order Amount (₹). The other will be calculated automatically based on daily fuel rates."
+            "type": "If",
+            "condition": "${form.vehicle_series} == 'ly'",
+            "then": [
+              {
+                "type": "Dropdown",
+                "name": "vehicle_ly",
+                "label": "Q1b. Vehicle Number",
+                "required": true,
+                "data-source": [
+                  {
+                    "id": "MH04LY7394",
+                    "title": "MH04LY7394"
+                  },
+                  {
+                    "id": "MH04LY8816",
+                    "title": "MH04LY8816"
+                  },
+                  {
+                    "id": "MH04LY0661",
+                    "title": "MH04LY0661"
+                  },
+                  {
+                    "id": "MH04LY0668",
+                    "title": "MH04LY0668"
+                  },
+                  {
+                    "id": "MH04LY6794",
+                    "title": "MH04LY6794"
+                  },
+                  {
+                    "id": "MH04LY8806",
+                    "title": "MH04LY8806"
+                  },
+                  {
+                    "id": "MH04LY7397",
+                    "title": "MH04LY7397"
+                  },
+                  {
+                    "id": "MH04LY8801",
+                    "title": "MH04LY8801"
+                  },
+                  {
+                    "id": "MH04LY0263",
+                    "title": "MH04LY0263"
+                  },
+                  {
+                    "id": "MH04LY0657",
+                    "title": "MH04LY0657"
+                  },
+                  {
+                    "id": "MH04LY0264",
+                    "title": "MH04LY0264"
+                  },
+                  {
+                    "id": "MH04LY1107",
+                    "title": "MH04LY1107"
+                  },
+                  {
+                    "id": "MH04LY1624",
+                    "title": "MH04LY1624"
+                  },
+                  {
+                    "id": "MH04LY6779",
+                    "title": "MH04LY6779"
+                  },
+                  {
+                    "id": "MH04LY6792",
+                    "title": "MH04LY6792"
+                  },
+                  {
+                    "id": "MH04LY6801",
+                    "title": "MH04LY6801"
+                  },
+                  {
+                    "id": "MH04LY6783",
+                    "title": "MH04LY6783"
+                  },
+                  {
+                    "id": "MH04LY6809",
+                    "title": "MH04LY6809"
+                  },
+                  {
+                    "id": "MH04LY6763",
+                    "title": "MH04LY6763"
+                  },
+                  {
+                    "id": "MH04LY6778",
+                    "title": "MH04LY6778"
+                  },
+                  {
+                    "id": "MH04LY6797",
+                    "title": "MH04LY6797"
+                  },
+                  {
+                    "id": "MH04LY6785",
+                    "title": "MH04LY6785"
+                  },
+                  {
+                    "id": "MH04LY8803",
+                    "title": "MH04LY8803"
+                  },
+                  {
+                    "id": "MH04LY0656",
+                    "title": "MH04LY0656"
+                  },
+                  {
+                    "id": "MH04LY6793",
+                    "title": "MH04LY6793"
+                  },
+                  {
+                    "id": "MH04LY6803",
+                    "title": "MH04LY6803"
+                  },
+                  {
+                    "id": "MH04LY0266",
+                    "title": "MH04LY0266"
+                  },
+                  {
+                    "id": "MH04LY8804",
+                    "title": "MH04LY8804"
+                  },
+                  {
+                    "id": "MH04LY0655",
+                    "title": "MH04LY0655"
+                  },
+                  {
+                    "id": "MH04LY0662",
+                    "title": "MH04LY0662"
+                  },
+                  {
+                    "id": "MH04LY6807",
+                    "title": "MH04LY6807"
+                  },
+                  {
+                    "id": "MH04LY6774",
+                    "title": "MH04LY6774"
+                  },
+                  {
+                    "id": "MH04LY8810",
+                    "title": "MH04LY8810"
+                  },
+                  {
+                    "id": "MH04LY7399",
+                    "title": "MH04LY7399"
+                  },
+                  {
+                    "id": "MH04LY6782",
+                    "title": "MH04LY6782"
+                  },
+                  {
+                    "id": "MH04LY9766",
+                    "title": "MH04LY9766"
+                  },
+                  {
+                    "id": "MH04LY8796",
+                    "title": "MH04LY8796"
+                  },
+                  {
+                    "id": "MH04LY8795",
+                    "title": "MH04LY8795"
+                  },
+                  {
+                    "id": "MH04LY8815",
+                    "title": "MH04LY8815"
+                  },
+                  {
+                    "id": "MH04LY8812",
+                    "title": "MH04LY8812"
+                  },
+                  {
+                    "id": "MH04LY7392",
+                    "title": "MH04LY7392"
+                  },
+                  {
+                    "id": "MH04LY7395",
+                    "title": "MH04LY7395"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "If",
+            "condition": "${form.vehicle_series} == 'ju'",
+            "then": [
+              {
+                "type": "Dropdown",
+                "name": "vehicle_ju",
+                "label": "Q1b. Vehicle Number",
+                "required": true,
+                "data-source": [
+                  {
+                    "id": "MH04JU8012",
+                    "title": "MH04JU8012"
+                  },
+                  {
+                    "id": "MH04JU1978",
+                    "title": "MH04JU1978"
+                  },
+                  {
+                    "id": "MH04JU0645",
+                    "title": "MH04JU0645"
+                  },
+                  {
+                    "id": "MH04JU8948",
+                    "title": "MH04JU8948"
+                  },
+                  {
+                    "id": "MH04JU0643",
+                    "title": "MH04JU0643"
+                  },
+                  {
+                    "id": "MH04JU4812",
+                    "title": "MH04JU4812"
+                  },
+                  {
+                    "id": "MH04JU0657",
+                    "title": "MH04JU0657"
+                  },
+                  {
+                    "id": "MH04JU9505",
+                    "title": "MH04JU9505"
+                  },
+                  {
+                    "id": "MH04JU8950",
+                    "title": "MH04JU8950"
+                  },
+                  {
+                    "id": "MH04JU4809",
+                    "title": "MH04JU4809"
+                  },
+                  {
+                    "id": "MH04JU9489",
+                    "title": "MH04JU9489"
+                  },
+                  {
+                    "id": "MH04JU0659",
+                    "title": "MH04JU0659"
+                  },
+                  {
+                    "id": "MH04JU8956",
+                    "title": "MH04JU8956"
+                  },
+                  {
+                    "id": "MH04JU9496",
+                    "title": "MH04JU9496"
+                  },
+                  {
+                    "id": "MH04JU4811",
+                    "title": "MH04JU4811"
+                  },
+                  {
+                    "id": "MH04JU9498",
+                    "title": "MH04JU9498"
+                  },
+                  {
+                    "id": "MH04JU4512",
+                    "title": "MH04JU4512"
+                  },
+                  {
+                    "id": "MH04JU8006",
+                    "title": "MH04JU8006"
+                  },
+                  {
+                    "id": "MH04JU8954",
+                    "title": "MH04JU8954"
+                  },
+                  {
+                    "id": "MH04JU0644",
+                    "title": "MH04JU0644"
+                  },
+                  {
+                    "id": "MH04JU1974",
+                    "title": "MH04JU1974"
+                  },
+                  {
+                    "id": "MH04JU3570",
+                    "title": "MH04JU3570"
+                  },
+                  {
+                    "id": "MH04JU4810",
+                    "title": "MH04JU4810"
+                  },
+                  {
+                    "id": "MH04JU3542",
+                    "title": "MH04JU3542"
+                  },
+                  {
+                    "id": "MH04JU1982",
+                    "title": "MH04JU1982"
+                  },
+                  {
+                    "id": "MH04JU0658",
+                    "title": "MH04JU0658"
+                  },
+                  {
+                    "id": "MH04JU0642",
+                    "title": "MH04JU0642"
+                  },
+                  {
+                    "id": "MH04JU6153",
+                    "title": "MH04JU6153"
+                  },
+                  {
+                    "id": "MH04JU4814",
+                    "title": "MH04JU4814"
+                  },
+                  {
+                    "id": "MH04JU0641",
+                    "title": "MH04JU0641"
+                  },
+                  {
+                    "id": "MH04JU9506",
+                    "title": "MH04JU9506"
+                  },
+                  {
+                    "id": "MH04JU8957",
+                    "title": "MH04JU8957"
+                  },
+                  {
+                    "id": "MH04JU8007",
+                    "title": "MH04JU8007"
+                  },
+                  {
+                    "id": "MH04JU1979",
+                    "title": "MH04JU1979"
+                  },
+                  {
+                    "id": "MH04JU8951",
+                    "title": "MH04JU8951"
+                  },
+                  {
+                    "id": "MH04JU3571",
+                    "title": "MH04JU3571"
+                  },
+                  {
+                    "id": "MH04JU3566",
+                    "title": "MH04JU3566"
+                  },
+                  {
+                    "id": "MH04JU1976",
+                    "title": "MH04JU1976"
+                  },
+                  {
+                    "id": "MH04JU4226",
+                    "title": "MH04JU4226"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "If",
+            "condition": "${form.vehicle_series} == 'le'",
+            "then": [
+              {
+                "type": "Dropdown",
+                "name": "vehicle_le",
+                "label": "Q1b. Vehicle Number",
+                "required": true,
+                "data-source": [
+                  {
+                    "id": "MH04LE8785",
+                    "title": "MH04LE8785"
+                  },
+                  {
+                    "id": "MH04LE7253",
+                    "title": "MH04LE7253"
+                  },
+                  {
+                    "id": "MH04LE2426",
+                    "title": "MH04LE2426"
+                  },
+                  {
+                    "id": "MH04LE2427",
+                    "title": "MH04LE2427"
+                  },
+                  {
+                    "id": "MH04LE7556",
+                    "title": "MH04LE7556"
+                  },
+                  {
+                    "id": "MH04LE7558",
+                    "title": "MH04LE7558"
+                  },
+                  {
+                    "id": "MH04LE7552",
+                    "title": "MH04LE7552"
+                  },
+                  {
+                    "id": "MH04LE1229",
+                    "title": "MH04LE1229"
+                  },
+                  {
+                    "id": "MH04LE7550",
+                    "title": "MH04LE7550"
+                  },
+                  {
+                    "id": "MH04LE1225",
+                    "title": "MH04LE1225"
+                  },
+                  {
+                    "id": "MH04LE1226",
+                    "title": "MH04LE1226"
+                  },
+                  {
+                    "id": "MH04LE8791",
+                    "title": "MH04LE8791"
+                  },
+                  {
+                    "id": "MH04LE7029",
+                    "title": "MH04LE7029"
+                  },
+                  {
+                    "id": "MH04LE1228",
+                    "title": "MH04LE1228"
+                  },
+                  {
+                    "id": "MH04LE8794",
+                    "title": "MH04LE8794"
+                  },
+                  {
+                    "id": "MH04LE8792",
+                    "title": "MH04LE8792"
+                  },
+                  {
+                    "id": "MH04LE7312",
+                    "title": "MH04LE7312"
+                  },
+                  {
+                    "id": "MH04LE2353",
+                    "title": "MH04LE2353"
+                  },
+                  {
+                    "id": "MH04LE1883",
+                    "title": "MH04LE1883"
+                  },
+                  {
+                    "id": "MH04LE6589",
+                    "title": "MH04LE6589"
+                  },
+                  {
+                    "id": "MH04LE7554",
+                    "title": "MH04LE7554"
+                  },
+                  {
+                    "id": "MH04LE8796",
+                    "title": "MH04LE8796"
+                  },
+                  {
+                    "id": "MH04LE6592",
+                    "title": "MH04LE6592"
+                  },
+                  {
+                    "id": "MH04LE7315",
+                    "title": "MH04LE7315"
+                  },
+                  {
+                    "id": "MH04LE7316",
+                    "title": "MH04LE7316"
+                  },
+                  {
+                    "id": "MH04LE7247",
+                    "title": "MH04LE7247"
+                  },
+                  {
+                    "id": "MH04LE1232",
+                    "title": "MH04LE1232"
+                  },
+                  {
+                    "id": "MH04LE7248",
+                    "title": "MH04LE7248"
+                  },
+                  {
+                    "id": "MH04LE7031",
+                    "title": "MH04LE7031"
+                  },
+                  {
+                    "id": "MH04LE1231",
+                    "title": "MH04LE1231"
+                  },
+                  {
+                    "id": "MH04LE1224",
+                    "title": "MH04LE1224"
+                  },
+                  {
+                    "id": "MH04LE1235",
+                    "title": "MH04LE1235"
+                  },
+                  {
+                    "id": "MH04LE7540",
+                    "title": "MH04LE7540"
+                  },
+                  {
+                    "id": "MH04LE7557",
+                    "title": "MH04LE7557"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "If",
+            "condition": "${form.vehicle_series} == 'lq'",
+            "then": [
+              {
+                "type": "Dropdown",
+                "name": "vehicle_lq",
+                "label": "Q1b. Vehicle Number",
+                "required": true,
+                "data-source": [
+                  {
+                    "id": "MH04LQ9782",
+                    "title": "MH04LQ9782"
+                  },
+                  {
+                    "id": "MH04LQ9780",
+                    "title": "MH04LQ9780"
+                  },
+                  {
+                    "id": "MH04LQ0667",
+                    "title": "MH04LQ0667"
+                  },
+                  {
+                    "id": "MH04LQ0568",
+                    "title": "MH04LQ0568"
+                  },
+                  {
+                    "id": "MH04LQ0255",
+                    "title": "MH04LQ0255"
+                  },
+                  {
+                    "id": "MH04LQ0669",
+                    "title": "MH04LQ0669"
+                  },
+                  {
+                    "id": "MH04LQ0569",
+                    "title": "MH04LQ0569"
+                  },
+                  {
+                    "id": "MH04LQ8318",
+                    "title": "MH04LQ8318"
+                  },
+                  {
+                    "id": "MH04LQ0257",
+                    "title": "MH04LQ0257"
+                  },
+                  {
+                    "id": "MH04LQ9775",
+                    "title": "MH04LQ9775"
+                  },
+                  {
+                    "id": "MH04LQ0573",
+                    "title": "MH04LQ0573"
+                  },
+                  {
+                    "id": "MH04LQ8870",
+                    "title": "MH04LQ8870"
+                  },
+                  {
+                    "id": "MH04LQ9778",
+                    "title": "MH04LQ9778"
+                  },
+                  {
+                    "id": "MH04LQ4291",
+                    "title": "MH04LQ4291"
+                  },
+                  {
+                    "id": "MH04LQ7716",
+                    "title": "MH04LQ7716"
+                  },
+                  {
+                    "id": "MH04LQ7715",
+                    "title": "MH04LQ7715"
+                  },
+                  {
+                    "id": "MH04LQ4290",
+                    "title": "MH04LQ4290"
+                  },
+                  {
+                    "id": "MH04LQ0668",
+                    "title": "MH04LQ0668"
+                  },
+                  {
+                    "id": "MH04LQ9773",
+                    "title": "MH04LQ9773"
+                  },
+                  {
+                    "id": "MH04LQ8873",
+                    "title": "MH04LQ8873"
+                  },
+                  {
+                    "id": "MH04LQ4289",
+                    "title": "MH04LQ4289"
+                  },
+                  {
+                    "id": "MH04LQ0249",
+                    "title": "MH04LQ0249"
+                  },
+                  {
+                    "id": "MH04LQ0258",
+                    "title": "MH04LQ0258"
+                  },
+                  {
+                    "id": "MH04LQ4297",
+                    "title": "MH04LQ4297"
+                  },
+                  {
+                    "id": "MH04LQ8036",
+                    "title": "MH04LQ8036"
+                  },
+                  {
+                    "id": "MH04LQ0664",
+                    "title": "MH04LQ0664"
+                  },
+                  {
+                    "id": "MH04LQ0665",
+                    "title": "MH04LQ0665"
+                  },
+                  {
+                    "id": "MH04LQ8872",
+                    "title": "MH04LQ8872"
+                  },
+                  {
+                    "id": "MH04LQ4286",
+                    "title": "MH04LQ4286"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "If",
+            "condition": "${form.vehicle_series} == 'kf'",
+            "then": [
+              {
+                "type": "Dropdown",
+                "name": "vehicle_kf",
+                "label": "Q1b. Vehicle Number",
+                "required": true,
+                "data-source": [
+                  {
+                    "id": "MH04KF2512",
+                    "title": "MH04KF2512"
+                  },
+                  {
+                    "id": "MH04KF2524",
+                    "title": "MH04KF2524"
+                  },
+                  {
+                    "id": "MH04KF2367",
+                    "title": "MH04KF2367"
+                  },
+                  {
+                    "id": "MH04KF2374",
+                    "title": "MH04KF2374"
+                  },
+                  {
+                    "id": "MH04KF5807",
+                    "title": "MH04KF5807"
+                  },
+                  {
+                    "id": "MH04KF3632",
+                    "title": "MH04KF3632"
+                  },
+                  {
+                    "id": "MH04KF7908",
+                    "title": "MH04KF7908"
+                  },
+                  {
+                    "id": "MH04KF5769",
+                    "title": "MH04KF5769"
+                  },
+                  {
+                    "id": "MH04KF5806",
+                    "title": "MH04KF5806"
+                  },
+                  {
+                    "id": "MH04KF2766",
+                    "title": "MH04KF2766"
+                  },
+                  {
+                    "id": "MH04KF5768",
+                    "title": "MH04KF5768"
+                  },
+                  {
+                    "id": "MH04KF2091",
+                    "title": "MH04KF2091"
+                  },
+                  {
+                    "id": "MH04KF3607",
+                    "title": "MH04KF3607"
+                  },
+                  {
+                    "id": "MH04KF5238",
+                    "title": "MH04KF5238"
+                  },
+                  {
+                    "id": "MH04KF2517",
+                    "title": "MH04KF2517"
+                  },
+                  {
+                    "id": "MH04KF5608",
+                    "title": "MH04KF5608"
+                  },
+                  {
+                    "id": "MH04KF7447",
+                    "title": "MH04KF7447"
+                  },
+                  {
+                    "id": "MH04KF8229",
+                    "title": "MH04KF8229"
+                  },
+                  {
+                    "id": "MH04KF2366",
+                    "title": "MH04KF2366"
+                  },
+                  {
+                    "id": "MH04KF5770",
+                    "title": "MH04KF5770"
+                  },
+                  {
+                    "id": "MH04KF5810",
+                    "title": "MH04KF5810"
+                  },
+                  {
+                    "id": "MH04KF2368",
+                    "title": "MH04KF2368"
+                  },
+                  {
+                    "id": "MH04KF3613",
+                    "title": "MH04KF3613"
+                  },
+                  {
+                    "id": "MH04KF5816",
+                    "title": "MH04KF5816"
+                  },
+                  {
+                    "id": "MH04KF5813",
+                    "title": "MH04KF5813"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "If",
+            "condition": "${form.vehicle_series} == 'mr'",
+            "then": [
+              {
+                "type": "Dropdown",
+                "name": "vehicle_mr",
+                "label": "Q1b. Vehicle Number",
+                "required": true,
+                "data-source": [
+                  {
+                    "id": "MH04MR4948",
+                    "title": "MH04MR4948"
+                  },
+                  {
+                    "id": "MH04MR0335",
+                    "title": "MH04MR0335"
+                  },
+                  {
+                    "id": "MH04MR4942",
+                    "title": "MH04MR4942"
+                  },
+                  {
+                    "id": "MH04MR0331",
+                    "title": "MH04MR0331"
+                  },
+                  {
+                    "id": "MH04MR0595",
+                    "title": "MH04MR0595"
+                  },
+                  {
+                    "id": "MH04MR7663",
+                    "title": "MH04MR7663"
+                  },
+                  {
+                    "id": "MH04MR0334",
+                    "title": "MH04MR0334"
+                  },
+                  {
+                    "id": "MH04MR0268",
+                    "title": "MH04MR0268"
+                  },
+                  {
+                    "id": "MH04MR4945",
+                    "title": "MH04MR4945"
+                  },
+                  {
+                    "id": "MH04MR3207",
+                    "title": "MH04MR3207"
+                  },
+                  {
+                    "id": "MH04MR3211",
+                    "title": "MH04MR3211"
+                  },
+                  {
+                    "id": "MH04MR7662",
+                    "title": "MH04MR7662"
+                  },
+                  {
+                    "id": "MH04MR5179",
+                    "title": "MH04MR5179"
+                  },
+                  {
+                    "id": "MH04MR5180",
+                    "title": "MH04MR5180"
+                  },
+                  {
+                    "id": "MH04MR3208",
+                    "title": "MH04MR3208"
+                  },
+                  {
+                    "id": "MH04MR0332",
+                    "title": "MH04MR0332"
+                  },
+                  {
+                    "id": "MH04MR7664",
+                    "title": "MH04MR7664"
+                  },
+                  {
+                    "id": "MH04MR4909",
+                    "title": "MH04MR4909"
+                  },
+                  {
+                    "id": "MH04MR7665",
+                    "title": "MH04MR7665"
+                  },
+                  {
+                    "id": "MH04MR8422",
+                    "title": "MH04MR8422"
+                  },
+                  {
+                    "id": "MH04MR3210",
+                    "title": "MH04MR3210"
+                  },
+                  {
+                    "id": "MH04MR2290",
+                    "title": "MH04MR2290"
+                  },
+                  {
+                    "id": "MH04MR4947",
+                    "title": "MH04MR4947"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "If",
+            "condition": "${form.vehicle_series} == 'mh'",
+            "then": [
+              {
+                "type": "Dropdown",
+                "name": "vehicle_mh",
+                "label": "Q1b. Vehicle Number",
+                "required": true,
+                "data-source": [
+                  {
+                    "id": "MH04MH4846",
+                    "title": "MH04MH4846"
+                  },
+                  {
+                    "id": "MH04MH4857",
+                    "title": "MH04MH4857"
+                  },
+                  {
+                    "id": "MH04MH4850",
+                    "title": "MH04MH4850"
+                  },
+                  {
+                    "id": "MH04MH4838",
+                    "title": "MH04MH4838"
+                  },
+                  {
+                    "id": "MH04MH4834",
+                    "title": "MH04MH4834"
+                  },
+                  {
+                    "id": "MH04MH5421",
+                    "title": "MH04MH5421"
+                  },
+                  {
+                    "id": "MH04MH5437",
+                    "title": "MH04MH5437"
+                  },
+                  {
+                    "id": "MH04MH4836",
+                    "title": "MH04MH4836"
+                  },
+                  {
+                    "id": "MH04MH4840",
+                    "title": "MH04MH4840"
+                  },
+                  {
+                    "id": "MH04MH5440",
+                    "title": "MH04MH5440"
+                  },
+                  {
+                    "id": "MH04MH4844",
+                    "title": "MH04MH4844"
+                  },
+                  {
+                    "id": "MH04MH4833",
+                    "title": "MH04MH4833"
+                  },
+                  {
+                    "id": "MH04MH4964",
+                    "title": "MH04MH4964"
+                  },
+                  {
+                    "id": "MH04MH5439",
+                    "title": "MH04MH5439"
+                  },
+                  {
+                    "id": "MH04MH4967",
+                    "title": "MH04MH4967"
+                  },
+                  {
+                    "id": "MH04MH4842",
+                    "title": "MH04MH4842"
+                  },
+                  {
+                    "id": "MH04MH4858",
+                    "title": "MH04MH4858"
+                  },
+                  {
+                    "id": "MH04MH4961",
+                    "title": "MH04MH4961"
+                  },
+                  {
+                    "id": "MH04MH4965",
+                    "title": "MH04MH4965"
+                  },
+                  {
+                    "id": "MH04MH4837",
+                    "title": "MH04MH4837"
+                  },
+                  {
+                    "id": "MH04MH5450",
+                    "title": "MH04MH5450"
+                  },
+                  {
+                    "id": "MH04MH4855",
+                    "title": "MH04MH4855"
+                  },
+                  {
+                    "id": "MH04MH4963",
+                    "title": "MH04MH4963"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "If",
+            "condition": "${form.vehicle_series} == 'ku'",
+            "then": [
+              {
+                "type": "Dropdown",
+                "name": "vehicle_ku",
+                "label": "Q1b. Vehicle Number",
+                "required": true,
+                "data-source": [
+                  {
+                    "id": "MH04KU4997",
+                    "title": "MH04KU4997"
+                  },
+                  {
+                    "id": "MH04KU6559",
+                    "title": "MH04KU6559"
+                  },
+                  {
+                    "id": "MH04KU5008",
+                    "title": "MH04KU5008"
+                  },
+                  {
+                    "id": "MH04KU4998",
+                    "title": "MH04KU4998"
+                  },
+                  {
+                    "id": "MH04KU5012",
+                    "title": "MH04KU5012"
+                  },
+                  {
+                    "id": "MH04KU6557",
+                    "title": "MH04KU6557"
+                  },
+                  {
+                    "id": "MH04KU5710",
+                    "title": "MH04KU5710"
+                  },
+                  {
+                    "id": "MH04KU5003",
+                    "title": "MH04KU5003"
+                  },
+                  {
+                    "id": "MH04KU6554",
+                    "title": "MH04KU6554"
+                  },
+                  {
+                    "id": "MH04KU5014",
+                    "title": "MH04KU5014"
+                  },
+                  {
+                    "id": "MH04KU5564",
+                    "title": "MH04KU5564"
+                  },
+                  {
+                    "id": "MH04KU5704",
+                    "title": "MH04KU5704"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "If",
+            "condition": "${form.vehicle_series} == 'other'",
+            "then": [
+              {
+                "type": "Dropdown",
+                "name": "vehicle_other",
+                "label": "Q1b. Vehicle Number",
+                "required": true,
+                "data-source": [
+                  {
+                    "id": "MH04HD4966",
+                    "title": "MH04HD4966"
+                  },
+                  {
+                    "id": "MH04HS1078",
+                    "title": "MH04HS1078"
+                  },
+                  {
+                    "id": "MH04JK8821",
+                    "title": "MH04JK8821"
+                  },
+                  {
+                    "id": "MH04HY1028",
+                    "title": "MH04HY1028"
+                  },
+                  {
+                    "id": "MH04JK8814",
+                    "title": "MH04JK8814"
+                  },
+                  {
+                    "id": "MH04JK8816",
+                    "title": "MH04JK8816"
+                  },
+                  {
+                    "id": "MH04HS1079",
+                    "title": "MH04HS1079"
+                  },
+                  {
+                    "id": "MH04NB0952",
+                    "title": "MH04NB0952"
+                  },
+                  {
+                    "id": "MH04HD5188",
+                    "title": "MH04HD5188"
+                  },
+                  {
+                    "id": "MH04JK8815",
+                    "title": "MH04JK8815"
+                  },
+                  {
+                    "id": "MH04HS1076",
+                    "title": "MH04HS1076"
+                  },
+                  {
+                    "id": "MH04HS1067",
+                    "title": "MH04HS1067"
+                  },
+                  {
+                    "id": "MH04HD4963",
+                    "title": "MH04HD4963"
+                  },
+                  {
+                    "id": "MH04JK8812",
+                    "title": "MH04JK8812"
+                  },
+                  {
+                    "id": "MH04HY9325",
+                    "title": "MH04HY9325"
+                  },
+                  {
+                    "id": "MH04HD5192",
+                    "title": "MH04HD5192"
+                  },
+                  {
+                    "id": "MH04JK8817",
+                    "title": "MH04JK8817"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "Dropdown",
+            "name": "fuel_type",
+            "label": "Q2. Fuel",
+            "required": true,
+            "data-source": [
+              {
+                "id": "MS (Petrol)",
+                "title": "MS (Petrol)"
+              },
+              {
+                "id": "XP95 (Petrol)",
+                "title": "XP95 (Petrol)"
+              },
+              {
+                "id": "HSD (Diesel)",
+                "title": "HSD (Diesel)"
+              },
+              {
+                "id": "CNG",
+                "title": "CNG"
+              }
+            ]
+          },
+          {
+            "type": "RadioButtonsGroup",
+            "name": "is_full_tank",
+            "label": "Q3. Full Tank",
+            "required": true,
+            "data-source": [
+              {
+                "id": "no",
+                "title": "No (Specific Amount or Litres)"
+              },
+              {
+                "id": "yes",
+                "title": "Yes (Full Tank Auto Cut-Off)"
+              }
+            ]
+          },
+          {
+            "type": "If",
+            "condition": "${form.is_full_tank} == 'yes'",
+            "then": [
+              {
+                "type": "TextCaption",
+                "text": "✅ Full Tank selected: Dispenser fills until auto cut-off. Litres & Amount will be calculated directly from dispenser meter."
+              }
+            ]
+          },
+          {
+            "type": "If",
+            "condition": "${form.is_full_tank} != 'yes'",
+            "then": [
+              {
+                "type": "RadioButtonsGroup",
+                "name": "order_by",
+                "label": "Q4. Order By",
+                "required": true,
+                "data-source": [
+                  {
+                    "id": "litres",
+                    "title": "Litres (L)"
+                  },
+                  {
+                    "id": "amount",
+                    "title": "Amount in ₹"
+                  }
+                ]
+              },
+              {
+                "type": "If",
+                "condition": "${form.order_by} == 'amount'",
+                "then": [
+                  {
+                    "type": "TextInput",
+                    "name": "amount",
+                    "label": "Amount in Rupees (₹)",
+                    "required": true,
+                    "input-type": "number",
+                    "helper-text": "e.g. 2500.00, 5000.00 (Standard .00 precision)"
+                  }
+                ]
+              },
+              {
+                "type": "If",
+                "condition": "${form.order_by} != 'amount'",
+                "then": [
+                  {
+                    "type": "TextInput",
+                    "name": "litres",
+                    "label": "Quantity in Litres",
+                    "required": true,
+                    "input-type": "number",
+                    "helper-text": "e.g. 50.00, 100.00 (Standard .00 precision)"
+                  }
+                ]
+              },
+              {
+                "type": "TextCaption",
+                "text": "⛽ Standard Petrol Pump Precision: All calculations are strictly rounded and billed to 2 decimal places (.00) as per weights & measures regulations."
+              }
+            ]
+          },
+          {
+            "type": "RadioButtonsGroup",
+            "name": "is_enroute",
+            "label": "Q5. Enroute",
+            "required": true,
+            "data-source": [
+              {
+                "id": "yes",
+                "title": "Yes"
+              },
+              {
+                "id": "no",
+                "title": "No"
+              }
+            ]
+          },
+          {
+            "type": "Dropdown",
+            "name": "oil_material",
+            "label": "Q6. Oil / Lubricant",
+            "required": true,
+            "data-source": [
+              {
+                "id": "NONE",
+                "title": "None (No Lubricant Required)"
+              },
+              {
+                "id": "[059] SERVO 20W50 SPERMILE",
+                "title": "[059] SERVO 20W50 SPERMILE"
+              },
+              {
+                "id": "[058] TATA DEF 10 LTR",
+                "title": "[058] TATA DEF 10 LTR"
+              },
+              {
+                "id": "[103] 15W40 HYPERTORQ 15 LTR",
+                "title": "[103] 15W40 HYPERTORQ 15 LTR"
+              },
+              {
+                "id": "[102] 15W40 HYPERTORQ 5 LTR",
+                "title": "[102] 15W40 HYPERTORQ 5 LTR"
+              },
+              {
+                "id": "[101] SERVO DEF 10 LTR",
+                "title": "[101] SERVO DEF 10 LTR"
+              },
+              {
+                "id": "[204] GREASE 2 KG",
+                "title": "[204] GREASE 2 KG"
+              },
+              {
+                "id": "[203] CNG 500 ML",
+                "title": "[203] CNG 500 ML"
+              },
+              {
+                "id": "[202] CNG 1 LTR",
+                "title": "[202] CNG 1 LTR"
+              },
+              {
+                "id": "[201] LONG LIFE GREASE - 182 KG",
+                "title": "[201] LONG LIFE GREASE - 182 KG"
+              },
+              {
+                "id": "[57] CF4 15W40 26 LTR",
+                "title": "[57] CF4 15W40 26 LTR"
+              },
+              {
+                "id": "[56] SYSTEM 46 210 LTR",
+                "title": "[56] SYSTEM 46 210 LTR"
+              },
+              {
+                "id": "[055] ADBLUE 20 LTR",
+                "title": "[055] ADBLUE 20 LTR"
+              },
+              {
+                "id": "[54] 4T ZOOM",
+                "title": "[54] 4T ZOOM"
+              },
+              {
+                "id": "[53] DEF",
+                "title": "[53] DEF"
+              },
+              {
+                "id": "[52] ADDON PETROL - 0.5 ML",
+                "title": "[52] ADDON PETROL - 0.5 ML"
+              },
+              {
+                "id": "[51] ADDON DIESEL -  10 ML",
+                "title": "[51] ADDON DIESEL -  10 ML"
+              },
+              {
+                "id": "[050] GREASE - 1/2 KG",
+                "title": "[050] GREASE - 1/2 KG"
+              },
+              {
+                "id": "[49] ULTRA  10W  210 LTR",
+                "title": "[49] ULTRA  10W  210 LTR"
+              },
+              {
+                "id": "[48] SERVO GEM EP 1 182 KG",
+                "title": "[48] SERVO GEM EP 1 182 KG"
+              },
+              {
+                "id": "[47] FLEET CF4 3 LTR",
+                "title": "[47] FLEET CF4 3 LTR"
+              },
+              {
+                "id": "[46] CF4 15W40 1LTR",
+                "title": "[46] CF4 15W40 1LTR"
+              },
+              {
+                "id": "[45] TATA D.E.F 20 LTR",
+                "title": "[45] TATA D.E.F 20 LTR"
+              },
+              {
+                "id": "[44] GEAR OIL 210 LTR",
+                "title": "[44] GEAR OIL 210 LTR"
+              },
+              {
+                "id": "[43] 10W - 30",
+                "title": "[43] 10W - 30"
+              },
+              {
+                "id": "[42] 5W 30",
+                "title": "[42] 5W 30"
+              },
+              {
+                "id": "[41] ULTRA 10 W 210",
+                "title": "[41] ULTRA 10 W 210"
+              },
+              {
+                "id": "[40] ACID 1 LTR",
+                "title": "[40] ACID 1 LTR"
+              },
+              {
+                "id": "[39] D W  1 LTR",
+                "title": "[39] D W  1 LTR"
+              },
+              {
+                "id": "[38] D W  5 LTR",
+                "title": "[38] D W  5 LTR"
+              },
+              {
+                "id": "[037] TQ 500 ML",
+                "title": "[037] TQ 500 ML"
+              },
+              {
+                "id": "[036] SERVO D.E.F 20 LTR",
+                "title": "[036] SERVO D.E.F 20 LTR"
+              },
+              {
+                "id": "[035] HYDRAULIC 210 LTR",
+                "title": "[035] HYDRAULIC 210 LTR"
+              },
+              {
+                "id": "[034] HYDRAULIC 50 LTR",
+                "title": "[034] HYDRAULIC 50 LTR"
+              },
+              {
+                "id": "[033] HYDRAULIC 26 LTR",
+                "title": "[033] HYDRAULIC 26 LTR"
+              },
+              {
+                "id": "[032] HYDRAULIC 20 LTR",
+                "title": "[032] HYDRAULIC 20 LTR"
+              },
+              {
+                "id": "[031] HYDRAULIC 5 LTR",
+                "title": "[031] HYDRAULIC 5 LTR"
+              },
+              {
+                "id": "[030] GREASE 20 KG",
+                "title": "[030] GREASE 20 KG"
+              },
+              {
+                "id": "[029] GREASE 3 KG",
+                "title": "[029] GREASE 3 KG"
+              },
+              {
+                "id": "[028] GREASE 1 KG",
+                "title": "[028] GREASE 1 KG"
+              },
+              {
+                "id": "[027] GEAR 1 LTR",
+                "title": "[027] GEAR 1 LTR"
+              },
+              {
+                "id": "[026] GEAR 5 LTR",
+                "title": "[026] GEAR 5 LTR"
+              },
+              {
+                "id": "[025] GEAR 20 LTR",
+                "title": "[025] GEAR 20 LTR"
+              },
+              {
+                "id": "[024] TQ  5 LTR",
+                "title": "[024] TQ  5 LTR"
+              },
+              {
+                "id": "[023] TQ 1 LTR",
+                "title": "[023] TQ 1 LTR"
+              },
+              {
+                "id": "[022] ADDON SUPER D 250 ML",
+                "title": "[022] ADDON SUPER D 250 ML"
+              },
+              {
+                "id": "[021] ADDON SUPER D 100 ML",
+                "title": "[021] ADDON SUPER D 100 ML"
+              },
+              {
+                "id": "[020] ADDON D 100 ML",
+                "title": "[020] ADDON D 100 ML"
+              },
+              {
+                "id": "[019] ADDON D 40 ML",
+                "title": "[019] ADDON D 40 ML"
+              },
+              {
+                "id": "[018] ADDON D 20 ML",
+                "title": "[018] ADDON D 20 ML"
+              },
+              {
+                "id": "[017] COOLANT 500ML",
+                "title": "[017] COOLANT 500ML"
+              },
+              {
+                "id": "[016] COOLANT 1 LTR",
+                "title": "[016] COOLANT 1 LTR"
+              },
+              {
+                "id": "[015] BREAK 250 ML",
+                "title": "[015] BREAK 250 ML"
+              },
+              {
+                "id": "[014] BREAK 500 ML",
+                "title": "[014] BREAK 500 ML"
+              },
+              {
+                "id": "[013] 4T 1 LTR",
+                "title": "[013] 4T 1 LTR"
+              },
+              {
+                "id": "[012] 2T 40ML POUCH",
+                "title": "[012] 2T 40ML POUCH"
+              },
+              {
+                "id": "[011] MG 20W40 20 LTR",
+                "title": "[011] MG 20W40 20 LTR"
+              },
+              {
+                "id": "[010] MG 20W40 5 LTR",
+                "title": "[010] MG 20W40 5 LTR"
+              },
+              {
+                "id": "[009] MG 20W40 1 LTR",
+                "title": "[009] MG 20W40 1 LTR"
+              },
+              {
+                "id": "[008] MG 20W40 500 ML",
+                "title": "[008] MG 20W40 500 ML"
+              },
+              {
+                "id": "[007] 15W40 210 LTR",
+                "title": "[007] 15W40 210 LTR"
+              },
+              {
+                "id": "[006] 15W40 50 LTR",
+                "title": "[006] 15W40 50 LTR"
+              },
+              {
+                "id": "[005] 15W40 20 LTR",
+                "title": "[005] 15W40 20 LTR"
+              },
+              {
+                "id": "[004] 15W40 15 LTR",
+                "title": "[004] 15W40 15 LTR"
+              },
+              {
+                "id": "[003] 15W40 5 LTR",
+                "title": "[003] 15W40 5 LTR"
+              },
+              {
+                "id": "[002] 15W40 3 LTR",
+                "title": "[002] 15W40 3 LTR"
+              },
+              {
+                "id": "[001] 15W40 1 LTR",
+                "title": "[001] 15W40 1 LTR"
+              }
+            ]
           },
           {
             "type": "TextInput",
-            "name": "litres",
-            "label": "Quantity (in Litres)",
+            "name": "remarks",
+            "label": "Q7. Remarks",
             "required": false,
-            "input-type": "number",
-            "helper-text": "e.g. 500, 1000, 2000 Litres (Optional if amount is filled)"
-          },
-          {
-            "type": "TextInput",
-            "name": "amount",
-            "label": "Or Budget Amount (₹)",
-            "required": false,
-            "input-type": "number",
-            "helper-text": "e.g. 50000, 100000 in INR (Optional if litres is filled)"
+            "input-type": "text",
+            "helper-text": "e.g. Genset 40, Bay 2, Driver contact"
           },
           {
             "type": "Footer",
-            "label": "Confirm & Submit Order",
+            "label": "Submit Fuel Order",
             "on-click-action": {
               "name": "complete",
               "payload": {
-                "vehicle_number": "${form.vehicle_number}",
+                "vehicle_series": "${form.vehicle_series}",
+                "vehicle_ly": "${form.vehicle_ly}",
+                "vehicle_ju": "${form.vehicle_ju}",
+                "vehicle_le": "${form.vehicle_le}",
+                "vehicle_lq": "${form.vehicle_lq}",
+                "vehicle_kf": "${form.vehicle_kf}",
+                "vehicle_mr": "${form.vehicle_mr}",
+                "vehicle_mh": "${form.vehicle_mh}",
+                "vehicle_ku": "${form.vehicle_ku}",
+                "vehicle_other": "${form.vehicle_other}",
                 "fuel_type": "${form.fuel_type}",
+                "is_full_tank": "${form.is_full_tank}",
+                "order_by": "${form.order_by}",
                 "litres": "${form.litres}",
-                "amount": "${form.amount}"
+                "amount": "${form.amount}",
+                "is_enroute": "${form.is_enroute}",
+                "oil_material": "${form.oil_material}",
+                "remarks": "${form.remarks}"
               }
             }
           }

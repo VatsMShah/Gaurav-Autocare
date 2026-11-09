@@ -189,13 +189,17 @@ async function handleIncomingMessage(value) {
   const orderRecord = output.action === 'send_ticket' && output.orderDetails
     ? {
         ticketId: parsedSession.ticketId,
-        customerName: output.customer?.name,
+        customerName: output.customer?.company_name || output.customer?.name || 'Sheetal Parivahan',
         phone: output.phone,
         vehicleNumber: output.orderDetails.vehicle_number,
         fuelType: output.orderDetails.fuel_type,
         litres: output.orderDetails.litres,
         amount: output.orderDetails.amount,
         ratePerLitre: output.orderDetails.rate_per_litre,
+        isFullTank: output.orderDetails.is_full_tank,
+        isEnroute: output.orderDetails.is_enroute,
+        oilMaterial: output.orderDetails.oil_material,
+        remarks: output.orderDetails.remarks,
         orderStatus: 'Confirmed',
         paymentStatus: 'Pending',
         source: output.flowType === 'whatsapp_flow' ? 'whatsapp_flow' : 'whatsapp_bot',
@@ -238,7 +242,7 @@ async function handleIncomingMessage(value) {
       logger.warn('Failed to send interactive buttons, falling back to text', btnErr);
       await whatsapp.sendText(output.phone, output.response);
     }
-  } else if (output.action === 'send_fuel_flow') {
+  } else if (output.action === 'send_fuel_flow' || output.action === 'send_welcome') {
     if (hasValidFlowId) {
       try {
         await whatsapp.sendFuelOrderFlow(output.phone, config.whatsapp.flowId, output.customer);
@@ -255,7 +259,7 @@ async function handleIncomingMessage(value) {
     try {
       await whatsapp.sendInteractiveButtons(
         output.phone,
-        '⛽ Gaurav Autocare',
+        'Gaurav Auto Care',
         output.response,
         'Thank you for your order!',
         [

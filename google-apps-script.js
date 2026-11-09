@@ -124,10 +124,11 @@ function formatToIST(dateObj) {
  */
 function onOpen() {
   SpreadsheetApp.getUi()
-    .createMenu('⛽ Gaurav Autocare')
+    .createMenu('⛽ Gaurav Auto Care')
     .addItem('⚡ Create / Format All Database Tabs', 'setupDatabaseTabs')
     .addItem('📊 Create / Refresh KPI Dashboard', 'setupDashboardTab')
     .addItem('🔄 Populate Initial Fuel Rates', 'populateDefaultRates')
+    .addItem('⚡ Load Sheetal Parivahan & Lube Master', 'initSheetalParivahanData')
     .addToUi();
 }
 
@@ -214,7 +215,7 @@ function applyOrdersFormatting(sheet) {
 
   // Conditional Formatting: Soft Green for Completed / Paid, Soft Amber for Confirmed, Soft Red for Cancelled
   var rules = sheet.getConditionalFormatRules() || [];
-  
+
   var greenRule = SpreadsheetApp.newConditionalFormatRule()
     .whenTextEqualTo('Completed')
     .setBackground('#D1FAE5')
@@ -323,11 +324,18 @@ function populateDefaultRates() {
   var sheet = ss.getSheetByName('fuel_rates');
   if (!sheet) return;
 
+  var todayStr = Utilities.formatDate(new Date(), 'Asia/Kolkata', 'yyyy-MM-dd');
+  var nowIST = formatToIST(new Date());
+
+  var ratesData = [
+    ['Diesel', 98.18, todayStr, nowIST],
+    ['Petrol', 111.55, todayStr, nowIST],
+    ['XP95', 120.58, todayStr, nowIST],
+    ['CNG', 90.00, todayStr, nowIST]
+  ];
+
   if (sheet.getLastRow() <= 1) {
-    var todayStr = Utilities.formatDate(new Date(), 'Asia/Kolkata', 'yyyy-MM-dd');
-    var nowIST = formatToIST(new Date());
-    sheet.appendRow(['Diesel', 92.80, todayStr, nowIST]);
-    sheet.appendRow(['Petrol', 104.50, todayStr, nowIST]);
+    sheet.getRange(2, 1, ratesData.length, 4).setValues(ratesData);
   }
 }
 
@@ -347,16 +355,24 @@ function doPost(e) {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
 
     // ACTION: get_rates (Bot reads current fuel rates from sheet)
+    if (action === 'setup_sheetal_and_lubes') {
+      return initSheetalParivahanData();
+    }
+
     if (action === 'get_rates') {
       var ratesSheet = ss.getSheetByName('fuel_rates');
-      var rates = { Diesel: 92.80, Petrol: 104.50 };
+      var rates = { Diesel: 98.18, Petrol: 111.55, XP95: 120.58, CNG: 90.00 };
       if (ratesSheet && ratesSheet.getLastRow() > 1) {
         var data = ratesSheet.getRange(2, 1, ratesSheet.getLastRow() - 1, 2).getValues();
         for (var i = 0; i < data.length; i++) {
-          var fType = String(data[i][0]).trim();
+          var fType = String(data[i][0]).trim().toLowerCase();
           var fRate = parseFloat(data[i][1]) || 0;
-          if (/diesel/i.test(fType)) rates.Diesel = fRate;
-          if (/petrol/i.test(fType)) rates.Petrol = fRate;
+          if (fRate > 0) {
+            if (fType.indexOf('xp95') !== -1) rates.XP95 = fRate;
+            else if (fType.indexOf('diesel') !== -1 || fType.indexOf('hsd') !== -1) rates.Diesel = fRate;
+            else if (fType.indexOf('petrol') !== -1 || fType.indexOf('ms') !== -1) rates.Petrol = fRate;
+            else if (fType.indexOf('cng') !== -1) rates.CNG = fRate;
+          }
         }
       }
       return respondJson({ status: 'success', rates: rates });
@@ -368,18 +384,36 @@ function doPost(e) {
       var custSheet = ss.getSheetByName('customers');
       var customer = null;
       if (custSheet && custSheet.getLastRow() > 1) {
-        var numCols = Math.max(custSheet.getLastColumn(), 5);
+        var numCols = Math.max(custSheet.getLastColumn(), 4);
         var cData = custSheet.getRange(2, 1, custSheet.getLastRow() - 1, numCols).getValues();
         for (var j = 0; j < cData.length; j++) {
-          var rowPhone = String(cData[j][0] || '').replace(/\D/g, '').slice(-10);
-          if (rowPhone && rowPhone === searchPhone) {
+          var colA = String(cData[j][0] || '').trim();
+          var colB = String(cData[j][1] || '').trim();
+          var colC = String(cData[j][2] || '').trim();
+
+          // Check if searchPhone matches Column B (comma-separated authorized numbers)
+          // or Column A (legacy single phone format)
+          var isMatch = false;
+          var companyName = '';
+          var vehicleList = '';
+
+          if (colB && colB.indexOf(searchPhone) !== -1) {
+            isMatch = true;
+            companyName = colA;
+            vehicleList = colC;
+          } else if (colA && colA.replace(/\D/g, '').slice(-10) === searchPhone) {
+            isMatch = true;
+            companyName = String(cData[j][2] || colA);
+            vehicleList = String(cData[j][5] || cData[j][3] || '');
+          }
+
+          if (isMatch) {
             customer = {
-              phone: String(cData[j][0]),
-              name: String(cData[j][1] || ''),
-              company_name: String(cData[j][2] || ''),
-              email: String(cData[j][3] || ''),
-              gstin: String(cData[j][4] || ''),
-              group_ids: String(cData[j][7] || cData[j][5] || '')
+              phone: payload.phone,
+              name: companyName,
+              company_name: companyName,
+              vehicles: vehicleList,
+              isRegistered: true
             };
             break;
           }
@@ -436,7 +470,7 @@ function doGet(e) {
   }
   return respondJson({
     status: 'active',
-    name: 'Gaurav Autocare Google Sheets Database Sync',
+    name: 'Gaurav Auto Care Google Sheets Database Sync',
     time: formatToIST(new Date())
   });
 }
@@ -517,9 +551,13 @@ function resolveValue(data, headerName, conf, existingVal) {
   if (lowerH.indexOf('phone') !== -1 || lowerH.indexOf('mobile') !== -1) return data.phone || '';
   if (lowerH.indexOf('vehicle') !== -1) return String(data.vehicle_number || data.vehicleNumber || '').toUpperCase();
   if (lowerH.indexOf('fuel') !== -1) return data.fuel_type || data.fuelType || '';
-  if (lowerH.indexOf('quantity') !== -1 || lowerH.indexOf('litres') !== -1) return parseFloat(data.litres) || 0;
+  if (lowerH.indexOf('full tank') !== -1) return data.is_full_tank || data.isFullTank || 'No';
+  if (lowerH.indexOf('quantity') !== -1 || lowerH.indexOf('litres') !== -1) return data.litres !== undefined ? data.litres : 0;
   if (lowerH.indexOf('rate') !== -1) return parseFloat(data.rate_per_litre || data.rate) || 0;
-  if (lowerH.indexOf('amount') !== -1) return parseFloat(data.estimated_amount || data.amount) || 0;
+  if (lowerH.indexOf('amount') !== -1) return data.estimated_amount !== undefined ? data.estimated_amount : (data.amount !== undefined ? data.amount : 0);
+  if (lowerH.indexOf('enroute') !== -1) return data.is_enroute || data.isEnroute || 'No';
+  if (lowerH.indexOf('oil') !== -1 || lowerH.indexOf('lube') !== -1) return data.oil_material || data.oilMaterial || 'None';
+  if (lowerH.indexOf('remark') !== -1) return data.remarks || '';
   if (lowerH.indexOf('order status') !== -1) return capitalize(data.order_status || data.orderStatus || 'Confirmed');
   if (lowerH.indexOf('payment') !== -1) return capitalize(data.payment_status || data.paymentStatus || 'Pending');
   if (lowerH.indexOf('source') !== -1) return data.source || 'whatsapp_bot';
@@ -564,4 +602,138 @@ function rowToMap(headers, rowValues) {
 function respondJson(data) {
   return ContentService.createTextOutput(JSON.stringify(data))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+/**
+ * One-click function to populate Sheetal Parivahan fleet & Lube Master list
+ * and remove legacy placeholder logistics companies.
+ */
+function initSheetalParivahanData() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var nowIST = formatToIST(new Date());
+
+  // 1. SETUP & POPULATE 'customers' TAB
+  var custSheet = ss.getSheetByName('customers');
+  if (!custSheet) {
+    custSheet = ss.insertSheet('customers');
+  }
+
+  // Clear existing data (removes the 2 old logistics companies)
+  custSheet.clear();
+
+  // Set modern 1-row-per-company headers
+  var custHeaders = ['Company Name', 'Authorized Phone Numbers', 'Vehicle Numbers', 'Last Updated (IST)'];
+  custSheet.getRange(1, 1, 1, custHeaders.length).setValues([custHeaders]);
+  var custHeaderRange = custSheet.getRange(1, 1, 1, custHeaders.length);
+  custHeaderRange.setFontWeight('bold').setFontColor('#FFFFFF').setBackground('#1E3A8A');
+  custSheet.setFrozenRows(1);
+
+  // Sheetal Parivahan Data
+  var sheetalRow = [
+    'Sheetal Parivahan',
+    '9076021348, 7400062501, 9324993903, 7738022509, 8291083855, 9920981780, 7777030315, 9594780757, 9324983249, 9833611124, 7985916674, 9820500159',
+    'MH04MR4948, MH04HD4966, MH04LE8785, MH04LE7253, MH04KU4997, MH04MR0335, MH04LE2426, MH04KU6559, MH04MH4846, MH04LY7394, MH04LE2427, MH04LY8816, MH04LQ9782, MH04LY0661, MH04LE7556, MH04LY0668, MH04LQ9780, MH04MR4942, MH04LE7558, MH04KF2512, MH04KF2524, MH04HS1078, MH04LY6794, MH04MR0331, MH04MR0595, MH04KF2367, MH04KU5008, MH04KU4998, MH04KU5012, MH04KF2374, MH04LY8806, MH04LY7397, MH04LQ0667, MH04KF5807, MH04KF3632, MH04LQ0568, MH04KF7908, MH04JU8012, MH04KF5769, MH04KU6557, MH04JK8821, MH04JU1978, MH04MR7663, MH04LY8801, MH04LY0263, MH04LY0657, MH04LE7552, MH04LY0264, MH04LQ0255, MH04LQ0669, MH04JU0645, MH04KF5806, MH04JU8948, MH04JU0643, MH04MH4857, MH04JU4812, MH04HY1028, MH04MR0334, MH04LY1107, MH04KF2766, MH04MH4850, MH04LY1624, MH04MH4838, MH04MH4834, MH04LE1229, MH04JU0657, MH04KF5768, MH04LE7550, MH04LQ0569, MH04KF2091, MH04JU9505, MH04MH5421, MH04LE1225, MH04LY6779, MH04KF3607, MH04LQ8318, MH04LE1226, MH04KF5238, MH04JU8950, MH04MR0268, MH04LQ0257, MH04LQ9775, MH04LY6792, MH04LE8791, MH04MR4945, MH04MR3207, MH04MH5437, MH04LQ0573, MH04LE7029, MH04KF2517, MH04JU4809, MH04JU9489, MH04MH4836, MH04JU0659, MH04LE1228, MH04MH4840, MH04JU8956, MH04LY6801, MH04LE8794, MH04KU5710, MH04JU9496, MH04MR3211, MH04LE8792, MH04LE7312, MH04MH5440, MH04MH4844, MH04LY6783, MH04JU4811, MH04MH4833, MH04JU9498, MH04LY6809, MH04LY6763, MH04LE2353, MH04MR7662, MH04LQ8870, MH04LE1883, MH04MH4964, MH04LQ9778, MH04JU4512, MH04KF5608, MH04MR5179, MH04LY6778, MH04LQ4291, MH04LQ7716, MH04LQ7715, MH04KF7447, MH04MH5439, MH04JK8814, MH04JU8006, MH04MH4967, MH04JK8816, MH04LY6797, MH04MH4842, MH04LQ4290, MH04LY6785, MH04HS1079, MH04JU8954, MH04JU0644, MH04MR5180, MH04LQ0668, MH04LE6589, MH04KF8229, MH04MR3208, MH04LQ9773, MH04JU1974, MH04LY8803, MH04LQ8873, MH04LY0656, MH04KU5003, MH04MR0332, MH04KF2366, MH04NB0952, MH04LE7554, MH04KU6554, MH04KF5770, MH04JU3570, MH04JU4810, MH04LE8796, MH04JU3542, MH04LY6793, MH04LQ4289, MH04JU1982, MH04JU0658, MH04LY6803, MH04KU5014, MH04LY0266, MH04KF5810, MH04HD5188, MH04MR7664, MH04JK8815, MH04JU0642, MH04HS1076, MH04HS1067, MH04LQ0249, MH04JU6153, MH04MH4858, MH04MR4909, MH04KF2368, MH04MR7665, MH04LY8804, MH04LY0655, MH04LY0662, MH04MH4961, MH04LY6807, MH04LY6774, MH04LY8810, MH04LY7399, MH04JU4814, MH04HD4963, MH04LE6592, MH04LY6782, MH04LE7315, MH04LQ0258, MH04MH4965, MH04LY9766, MH04JU0641, MH04LQ4297, MH04LE7316, MH04LQ8036, MH04LE7247, MH04JK8812, MH04HY9325, MH04LE1232, MH04JU9506, MH04LE7248, MH04MR8422, MH04LE7031, MH04LQ0664, MH04LQ0665, MH04MR3210, MH04LY8796, MH04HD5192, MH04LY8795, MH04LY8815, MH04KU5564, MH04MH4837, MH04JU8957, MH04JU8007, MH04MH5450, MH04LY8812, MH04LE1231, MH04JU1979, MH04JK8817, MH04KF3613, MH04LE1224, MH04JU8951, MH04MR2290, MH04JU3571, MH04KF5816, MH04LE1235, MH04JU3566, MH04LY7392, MH04JU1976, MH04LE7540, MH04MR4947, MH04LQ8872, MH04LY7395, MH04LQ4286, MH04KF5813, MH04KU5704, MH04JU4226, MH04MH4855, MH04LE7557, MH04MH4963',
+    nowIST
+  ];
+  custSheet.appendRow(sheetalRow);
+  custSheet.getRange('A2:D2').setVerticalAlignment('middle').setWrap(true);
+  custSheet.setColumnWidth(1, 180);
+  custSheet.setColumnWidth(2, 300);
+  custSheet.setColumnWidth(3, 400);
+  custSheet.setColumnWidth(4, 160);
+
+  // 2. SETUP & POPULATE 'lube_master' TAB
+  var lubeSheet = ss.getSheetByName('lube_master');
+  if (!lubeSheet) {
+    lubeSheet = ss.insertSheet('lube_master');
+  }
+  lubeSheet.clear();
+
+  var lubeHeaders = ['Lube Code', 'Lube Name', 'Last Updated (IST)'];
+  lubeSheet.getRange(1, 1, 1, lubeHeaders.length).setValues([lubeHeaders]);
+  var lubeHeaderRange = lubeSheet.getRange(1, 1, 1, lubeHeaders.length);
+  lubeHeaderRange.setFontWeight('bold').setFontColor('#FFFFFF').setBackground('#1E3A8A');
+  lubeSheet.setFrozenRows(1);
+
+  var lubeRows = [
+    ['059', 'SERVO 20W50 SPERMILE', nowIST],
+    ['058', 'TATA DEF 10 LTR', nowIST],
+    ['103', '15W40 HYPERTORQ 15 LTR', nowIST],
+    ['102', '15W40 HYPERTORQ 5 LTR', nowIST],
+    ['101', 'SERVO DEF 10 LTR', nowIST],
+    ['204', 'GREASE 2 KG', nowIST],
+    ['203', 'CNG 500 ML', nowIST],
+    ['202', 'CNG 1 LTR', nowIST],
+    ['201', 'LONG LIFE GREASE - 182 KG', nowIST],
+    ['57', 'CF4 15W40 26 LTR', nowIST],
+    ['56', 'SYSTEM 46 210 LTR', nowIST],
+    ['055', 'ADBLUE 20 LTR', nowIST],
+    ['54', '4T ZOOM', nowIST],
+    ['53', 'DEF', nowIST],
+    ['52', 'ADDON PETROL - 0.5 ML', nowIST],
+    ['51', 'ADDON DIESEL -  10 ML', nowIST],
+    ['050', 'GREASE - 1/2 KG', nowIST],
+    ['49', 'ULTRA  10W  210 LTR', nowIST],
+    ['48', 'SERVO GEM EP 1 182 KG', nowIST],
+    ['47', 'FLEET CF4 3 LTR', nowIST],
+    ['46', 'CF4 15W40 1LTR', nowIST],
+    ['45', 'TATA D.E.F 20 LTR', nowIST],
+    ['44', 'GEAR OIL 210 LTR', nowIST],
+    ['43', '10W - 30', nowIST],
+    ['42', '5W 30', nowIST],
+    ['41', 'ULTRA 10 W 210', nowIST],
+    ['40', 'ACID 1 LTR', nowIST],
+    ['39', 'D W  1 LTR', nowIST],
+    ['38', 'D W  5 LTR', nowIST],
+    ['037', 'TQ 500 ML', nowIST],
+    ['036', 'SERVO D.E.F 20 LTR', nowIST],
+    ['035', 'HYDRAULIC 210 LTR', nowIST],
+    ['034', 'HYDRAULIC 50 LTR', nowIST],
+    ['033', 'HYDRAULIC 26 LTR', nowIST],
+    ['032', 'HYDRAULIC 20 LTR', nowIST],
+    ['031', 'HYDRAULIC 5 LTR', nowIST],
+    ['030', 'GREASE 20 KG', nowIST],
+    ['029', 'GREASE 3 KG', nowIST],
+    ['028', 'GREASE 1 KG', nowIST],
+    ['027', 'GEAR 1 LTR', nowIST],
+    ['026', 'GEAR 5 LTR', nowIST],
+    ['025', 'GEAR 20 LTR', nowIST],
+    ['024', 'TQ  5 LTR', nowIST],
+    ['023', 'TQ 1 LTR', nowIST],
+    ['022', 'ADDON SUPER D 250 ML', nowIST],
+    ['021', 'ADDON SUPER D 100 ML', nowIST],
+    ['020', 'ADDON D 100 ML', nowIST],
+    ['019', 'ADDON D 40 ML', nowIST],
+    ['018', 'ADDON D 20 ML', nowIST],
+    ['017', 'COOLANT 500ML', nowIST],
+    ['016', 'COOLANT 1 LTR', nowIST],
+    ['015', 'BREAK 250 ML', nowIST],
+    ['014', 'BREAK 500 ML', nowIST],
+    ['013', '4T 1 LTR', nowIST],
+    ['012', '2T 40ML POUCH', nowIST],
+    ['011', 'MG 20W40 20 LTR', nowIST],
+    ['010', 'MG 20W40 5 LTR', nowIST],
+    ['009', 'MG 20W40 1 LTR', nowIST],
+    ['008', 'MG 20W40 500 ML', nowIST],
+    ['007', '15W40 210 LTR', nowIST],
+    ['006', '15W40 50 LTR', nowIST],
+    ['005', '15W40 20 LTR', nowIST],
+    ['004', '15W40 15 LTR', nowIST],
+    ['003', '15W40 5 LTR', nowIST],
+    ['002', '15W40 3 LTR', nowIST],
+    ['001', '15W40 1 LTR', nowIST]
+  ];
+
+  if (lubeRows.length > 0) {
+    lubeSheet.getRange(2, 1, lubeRows.length, 3).setValues(lubeRows);
+  }
+  lubeSheet.autoResizeColumns(1, 3);
+  lubeSheet.setColumnWidth(1, 100);
+  lubeSheet.setColumnWidth(2, 280);
+  lubeSheet.setColumnWidth(3, 160);
+
+  return respondJson({
+    status: 'success',
+    message: 'Sheetal Parivahan (12 numbers, 244 vehicles) and 66 Lube products added successfully!'
+  });
 }

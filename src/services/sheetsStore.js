@@ -7,7 +7,12 @@ let docPromise = null;
 
 // In-memory cache for fast read responses without delaying WhatsApp turns
 const rateCache = {
-  data: { Diesel: 92.80, Petrol: 104.50 },
+  data: {
+    Diesel: 98.18,
+    Petrol: 111.55,
+    XP95: 120.58,
+    CNG: 90.00,
+  },
   lastFetched: 0,
   ttl: 10 * 60 * 1000, // 10 minutes cache
 };
@@ -104,11 +109,13 @@ async function getFuelRates() {
   // 1. Try Apps Script Webhook
   if (config.google?.webhookUrl) {
     try {
-      const res = await callAppsScript({ action: 'get_rates' }, 2000);
+      const res = await callAppsScript({ action: 'get_rates' }, 6000);
       if (res && res.status === 'success' && res.rates) {
         rateCache.data = {
-          Diesel: parseFloat(res.rates.Diesel) || 92.80,
-          Petrol: parseFloat(res.rates.Petrol) || 104.50,
+          Diesel: parseFloat(res.rates.Diesel) || 98.18,
+          Petrol: parseFloat(res.rates.Petrol) || 111.55,
+          XP95: parseFloat(res.rates.XP95) || 120.58,
+          CNG: parseFloat(res.rates.CNG) || 90.00,
         };
         rateCache.lastFetched = now;
         logger.info('⛽ Refreshed live fuel rates from Google Sheet:', rateCache.data);
@@ -125,10 +132,14 @@ async function getFuelRates() {
       const sheet = await getSheet('fuel_rates', ['Fuel Type', 'Rate per Litre (₹)']);
       const rows = await sheet.getRows();
       for (const row of rows) {
-        const type = String(row.get('Fuel Type') || '').trim();
+        const type = String(row.get('Fuel Type') || '').trim().toLowerCase();
         const rate = parseFloat(row.get('Rate per Litre (₹)') || row.get('rate_per_litre')) || 0;
-        if (/diesel/i.test(type) && rate > 0) rateCache.data.Diesel = rate;
-        if (/petrol/i.test(type) && rate > 0) rateCache.data.Petrol = rate;
+        if (rate > 0) {
+          if (type.includes('xp95')) rateCache.data.XP95 = rate;
+          else if (type.includes('diesel') || type.includes('hsd')) rateCache.data.Diesel = rate;
+          else if (type.includes('petrol') || type.includes('ms')) rateCache.data.Petrol = rate;
+          else if (type.includes('cng')) rateCache.data.CNG = rate;
+        }
       }
       rateCache.lastFetched = now;
       return rateCache.data;

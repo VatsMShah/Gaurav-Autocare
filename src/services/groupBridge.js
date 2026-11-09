@@ -77,10 +77,11 @@ class GroupBridge {
           }
 
           clearTimeout(this.reconnectTimeout);
+          const reconnectDelay = statusCode === 408 ? 15000 : 5000;
           this.reconnectTimeout = setTimeout(() => {
             this.isInitializing = false;
-            this.init().catch((err) => logger.error('Reconnection failed:', err));
-          }, 3000);
+            this.init().catch((err) => logger.warn('[Group Bridge] Reconnection note: ' + err.message));
+          }, reconnectDelay);
         } else if (connection === 'open') {
           this.connectionStatus = 'connected';
           this.connectedUser = this.sock.user?.id || 'Connected';

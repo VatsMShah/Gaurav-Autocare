@@ -106,9 +106,19 @@ async function sendFlowDatePicker(to, flowId, minDate) {
 /**
  * Sends the Gaurav Autocare native WhatsApp Flow form for Fuel Truck Orders.
  */
-async function sendFuelOrderFlow(to, flowId, customerInfo = {}) {
-  const customerName = customerInfo.name || 'Valued Customer';
-  const customerPhone = customerInfo.phone || (to ? `+${to}` : '');
+async function sendFuelOrderFlow(to, flowId, customerInfo = {}, vehicleOptions = []) {
+  const companyName = customerInfo.company_name || customerInfo.company || customerInfo.name || 'Valued Fleet Partner';
+  const managerPhone = customerInfo.phone || (to ? `+${to}` : '');
+
+  // Default fallback vehicle list (can be overridden dynamically from Sheets)
+  const defaultVehicles = [
+    { id: 'MH 04 AB 1234', title: 'MH 04 AB 1234' },
+    { id: 'MH 04 CD 5678', title: 'MH 04 CD 5678' },
+    { id: 'MH 04 EF 9012', title: 'MH 04 EF 9012' },
+    { id: 'OTHER', title: 'Other Vehicle (Specify in Remarks)' },
+  ];
+
+  const vehicles = Array.isArray(vehicleOptions) && vehicleOptions.length > 0 ? vehicleOptions : defaultVehicles;
 
   return callGraphApi({
     messaging_product: 'whatsapp',
@@ -119,17 +129,17 @@ async function sendFuelOrderFlow(to, flowId, customerInfo = {}) {
       type: 'flow',
       header: {
         type: 'text',
-        text: '⛽ Gaurav Autocare',
+        text: 'Gaurav Auto Care',
       },
       body: {
         text:
-          `🙏 *Hii, Welcome to Gaurav Autocare*\n\n` +
-          `👤 *Customer Name:* ${customerName}\n` +
-          `📱 *Mobile Number:* ${customerPhone}\n\n` +
-          `Please tap the button below to fill your Fuel Truck order details (Vehicle number, Petrol/Diesel, Litres & Amount):`,
+          `🙏 *Welcome to Gaurav Auto Care*\n\n` +
+          `🏢 *Your company name:* ${companyName}\n` +
+          `📱 *Your Number:* ${managerPhone}\n\n` +
+          `Please tap the button below to book fuel for your vehicle:`,
       },
       footer: {
-        text: 'Gaurav Autocare Fuel Truck Desk',
+        text: 'Gaurav Auto Care Fuel Desk',
       },
       action: {
         name: 'flow',
@@ -137,13 +147,14 @@ async function sendFuelOrderFlow(to, flowId, customerInfo = {}) {
           flow_message_version: '3',
           flow_token: `fuel_${to}_${Date.now()}`,
           flow_id: flowId,
-          flow_cta: '📋 Order Fuel Truck',
+          flow_cta: '📋 Book Fuel',
           flow_action: 'navigate',
           flow_action_payload: {
             screen: 'FUEL_ORDER_FORM',
             data: {
-              customer_name: customerName,
-              customer_phone: customerPhone,
+              company_name: companyName,
+              manager_phone: managerPhone,
+              vehicles,
             },
           },
         },

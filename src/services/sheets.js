@@ -40,16 +40,21 @@ function toISTString(date = new Date()) {
 async function saveFuelTruckOrder(order) {
   if (!isConfigured()) return order;
   try {
+    const isFullTank = order.isFullTank === 'Yes' || order.is_full_tank === 'Yes';
     const formattedRow = {
       ticket_id: order.ticketId || order.ticket_id,
       created_at: order.created_at || order.createdAt || toISTString(),
-      customer_name: order.customerName || order.customer_name || 'Valued Customer',
+      customer_name: order.customerName || order.customer_name || 'Sheetal Parivahan',
       phone: order.phone || '',
       vehicle_number: (order.vehicleNumber || order.vehicle_number || '').toUpperCase(),
       fuel_type: order.fuelType || order.fuel_type || 'Diesel',
-      litres: parseFloat(order.litres) || 0,
+      is_full_tank: isFullTank ? 'Yes' : 'No',
+      litres: isFullTank ? 'Full Tank' : (parseFloat(order.litres) || 0),
       rate_per_litre: parseFloat(order.ratePerLitre || order.rate_per_litre) || 0,
-      estimated_amount: parseFloat(order.amount || order.estimated_amount) || 0,
+      estimated_amount: isFullTank ? 'Cut-Off' : (parseFloat(order.amount || order.estimated_amount) || 0),
+      is_enroute: order.isEnroute || order.is_enroute || 'No',
+      oil_material: order.oilMaterial || order.oil_material || 'None',
+      remarks: order.remarks || '',
       order_status: order.orderStatus || order.order_status || 'Confirmed',
       payment_status: order.paymentStatus || order.payment_status || 'Pending',
       source: order.source || 'whatsapp_bot',

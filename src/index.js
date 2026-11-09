@@ -260,6 +260,7 @@ app.post('/webhook', async (req, res) => {
           field: change.field,
           hasValue: Boolean(change.value),
         });
+        logger.info('RAW WEBHOOK VALUE: ' + JSON.stringify(change.value));
         await handleIncomingMessage(change.value);
       }
     }
@@ -273,8 +274,12 @@ app.listen(config.port, () => {
   logger.info(`Webhook URL (local): http://localhost:${config.port}/webhook`);
   logger.info(`WhatsApp Group Bridge QR page: http://localhost:${config.port}/qr`);
 
-  // Initialize the WhatsApp Web Group Bridge
-  groupBridge.init().catch((err) => {
-    logger.error('Failed to initialize Group Bridge on startup:', err);
-  });
+  // Initialize the WhatsApp Web Group Bridge only if group notifications are configured
+  if (process.env.DEFAULT_NOTIFICATION_GROUP_ID && process.env.DEFAULT_NOTIFICATION_GROUP_ID.trim()) {
+    groupBridge.init().catch((err) => {
+      logger.error('Failed to initialize Group Bridge on startup:', err);
+    });
+  } else {
+    logger.info('ℹ️ WhatsApp Group Bridge paused (DEFAULT_NOTIFICATION_GROUP_ID is not set).');
+  }
 });

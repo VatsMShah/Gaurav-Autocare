@@ -1,13 +1,31 @@
 const { extractCustomerInfo } = require('../services/customerService');
 const logger = require('../utils/logger');
 
+// Authorized mobile numbers for Sheetal Parivahan (commercial fleet booking)
+const AUTHORIZED_PHONES = new Set([
+  '9076021348',
+  '7400062501',
+  '9324993903',
+  '7738022509',
+  '8291083855',
+  '9920981780',
+  '7777030315',
+  '9594780757',
+  '9324983249',
+  '9833611124',
+  '7985916674',
+  '9820500159',
+]);
+
 // In-memory session store so bot works without database setup
 const memorySessions = new Map();
 
-// Default fallback pump rates
+// Client Petrol Pump Daily Active Rates (Gaurav Autocare)
 const DEFAULT_RATES = {
-  Diesel: 92.80,
-  Petrol: 104.50,
+  Diesel: 98.18,   // ₹98.18 / Litre
+  Petrol: 111.55,  // ₹111.55 / Litre (MS)
+  XP95: 120.58,    // ₹120.58 / Litre (Premium Petrol)
+  CNG: 90.00,      // ₹90.00 / KG
 };
 
 /**
@@ -22,7 +40,7 @@ function safeJsonParse(str, fallback = {}) {
 }
 
 /**
- * Generates a clean, professional Fuel Truck Order ticket string
+ * Generates a clean, professional Fuel Truck Order ticket string (Option 3: Streamlined Single-Block)
  */
 function generateOrderTicket({ ticketId, customer, orderDetails }) {
   const now = new Date();
@@ -36,63 +54,55 @@ function generateOrderTicket({ ticketId, customer, orderDetails }) {
     hour12: true,
   });
 
-  const formattedAmount = Number(orderDetails.amount)
-    ? `₹${Number(orderDetails.amount).toLocaleString('en-IN')}`
-    : `₹${orderDetails.amount}`;
+  const isCng = /cng/i.test(orderDetails.fuel_type || '');
+  const unitLabel = isCng ? 'KG' : 'L';
+  const unitRateLabel = isCng
+    ? `₹${Number(orderDetails.rate_per_litre).toFixed(2)}/KG`
+    : `₹${Number(orderDetails.rate_per_litre).toFixed(2)}/L`;
 
   const rateDisplay = orderDetails.rate_per_litre
-    ? ` (₹${Number(orderDetails.rate_per_litre).toFixed(2)}/L)`
+    ? ` (${unitRateLabel})`
     : '';
 
+  const isFullTank = String(orderDetails.is_full_tank || '').toLowerCase() === 'yes';
+  const qtyDisplay = isFullTank ? 'Full Tank (Dispenser Cut-off)' : `${orderDetails.litres} ${unitLabel}`;
+  const amtDisplay = isFullTank ? 'As Per Cut-Off Reading' : (orderDetails.amount_display || `₹${Number(orderDetails.amount).toFixed(2)}`);
+
+  const remarksLine = (orderDetails.remarks && orderDetails.remarks !== 'N/A')
+    ? `• *Remarks:* ${orderDetails.remarks}\n\n`
+    : `\n`;
+
   return (
-    `=================================\n` +
-    `   🎫 *GAURAV AUTOCARE* ⛽\n` +
-    `   *FUEL TRUCK ORDER CONFIRMATION*\n` +
-    `=================================\n\n` +
-    `📌 *Ticket ID:* #${ticketId}\n` +
-    `📅 *Date & Time:* ${dateTimeStr}\n\n` +
-    `👤 *CUSTOMER DETAILS:*\n` +
-    `• *Name:* ${customer.name}\n` +
-    `• *Mobile:* ${customer.phone}\n` +
-    (customer.company ? `• *Company:* ${customer.company}\n\n` : `\n`) +
-    `🚛 *FUEL TRUCK ORDER DETAILS:*\n` +
+    `*FUEL ORDER CONFIRMATION*\n` +
+    `Ticket #${ticketId} | ${dateTimeStr}\n\n` +
+    `• *Company:* ${customer.company_name || customer.company || customer.name || 'Sheetal Parivahan'}\n` +
+    `• *Manager Mobile:* ${customer.phone}\n` +
     `• *Vehicle Number:* ${String(orderDetails.vehicle_number || '').toUpperCase()}\n` +
-    `• *Fuel Type:* ${orderDetails.fuel_type || 'Diesel'}${rateDisplay}\n` +
-    `• *Quantity:* ${orderDetails.litres} Litres\n` +
-    `• *Estimated Amount:* ${formattedAmount}\n\n` +
-    `📊 *Status:* ✅ *CONFIRMED & SCHEDULED*\n` +
-    `---------------------------------\n` +
-    `Your fuel truck order has been logged successfully! Our dispatch team is processing your request.\n\n` +
-    `Need another order or assistance? Just reply *Hi* anytime.\n` +
-    `Thank you for choosing *Gaurav Autocare*! ⛽🚛`
+    `• *Fuel Grade:* ${orderDetails.fuel_type || 'HSD (Diesel)'}${rateDisplay}\n` +
+    `• *Full Tank:* ${orderDetails.is_full_tank || (isFullTank ? 'Yes' : 'No')}\n` +
+    `• *Quantity:* ${qtyDisplay}\n` +
+    `• *Estimated Amount:* ${amtDisplay}\n` +
+    `• *Enroute Fueling:* ${orderDetails.is_enroute || 'No'}\n` +
+    `• *Oil / Lubricant:* ${orderDetails.oil_material || 'None'}\n` +
+    remarksLine +
+    `*Status:* Confirmed & Dispatched\n\n` +
+    `Your fuel order has been registered in real time.\n` +
+    `To place another order, simply reply *Hi*.`
   );
 }
 
 /**
- * Generates the welcome message text asking for all 3 details in one go
+ * Generates the welcome message text
  */
-function generateWelcomeMessage(customer, activeRates = DEFAULT_RATES) {
-  const dRate = (activeRates.Diesel || DEFAULT_RATES.Diesel).toFixed(2);
-  const pRate = (activeRates.Petrol || DEFAULT_RATES.Petrol).toFixed(2);
+function generateWelcomeMessage(customer) {
+  const company = customer.company_name || customer.company || customer.name || 'Sheetal Parivahan';
+  const phone = customer.phone || 'N/A';
 
   return (
-    `🙏 *Hii, Welcome to Gaurav Autocare* ⛽🚛\n\n` +
-    `👤 *Customer Name:* ${customer.name}\n` +
-    `📱 *Mobile Number:* ${customer.phone}\n` +
-    (customer.company ? `🏢 *Company:* ${customer.company}\n\n` : `\n`) +
-    `⛽ *Today's Rates:* Diesel ₹${dRate}/L | Petrol ₹${pRate}/L\n\n` +
-    `Please reply with your Fuel Truck order in this exact 3-line format:\n\n` +
-    `*Vehicle Number*\n` +
-    `*Diesel or Petrol*\n` +
-    `*Quantity (Litres) OR Price (Rupees)* _(Please enter only one)_\n\n` +
-    `📝 *Example 1 (By Quantity):*\n` +
-    `MH04XZ1212\n` +
-    `Diesel\n` +
-    `1000 Litres\n\n` +
-    `📝 *Example 2 (By Price):*\n` +
-    `MH04XZ1212\n` +
-    `Petrol\n` +
-    `2200 Rupees`
+    `🙏 *Welcome to Gaurav Auto Care* ⛽🚛\n\n` +
+    `🏢 *Your Company Name:* ${company}\n` +
+    `📱 *Your Number:* ${phone}\n\n` +
+    `Please tap the button below to book fuel for your vehicle:`
   );
 }
 
@@ -106,6 +116,8 @@ function validateAndParseFuelOrder(text, activeRates = DEFAULT_RATES) {
 
   const dieselRate = parseFloat(activeRates.Diesel) || DEFAULT_RATES.Diesel;
   const petrolRate = parseFloat(activeRates.Petrol) || DEFAULT_RATES.Petrol;
+  const xp95Rate = parseFloat(activeRates.XP95) || DEFAULT_RATES.XP95;
+  const cngRate = parseFloat(activeRates.CNG) || DEFAULT_RATES.CNG;
 
   // 1. Vehicle Number Validation
   const plateMatch = clean.match(/\b([A-Z]{2}[-\s]?[0-9]{1,2}[-\s]?[A-Z]{0,3}[-\s]?[0-9]{3,4})\b/i);
@@ -120,50 +132,59 @@ function validateAndParseFuelOrder(text, activeRates = DEFAULT_RATES) {
   let fuelType = null;
   let rate = dieselRate;
   const hasDiesel = /\b(diesel|hsd)\b/i.test(lower);
-  const hasPetrol = /\b(petrol|ms)\b/i.test(lower);
+  const hasXP95 = /\b(xp95|xp 95|speed|extra premium)\b/i.test(lower);
+  const hasPetrol = /\b(petrol|ms)\b/i.test(lower) && !hasXP95;
+  const hasCng = /\b(cng|gas)\b/i.test(lower);
 
-  if (hasDiesel && !hasPetrol) {
-    fuelType = 'Diesel';
+  const matchedGrades = [hasDiesel, hasPetrol, hasXP95, hasCng].filter(Boolean).length;
+  if (matchedGrades > 1) {
+    errors.push('❌ *Conflicting Fuel Type:* Please choose only one fuel type (*Diesel*, *Petrol*, *XP95*, or *CNG*).');
+  } else if (hasXP95) {
+    fuelType = 'XP95 (Petrol)';
+    rate = xp95Rate;
+  } else if (hasDiesel) {
+    fuelType = 'HSD (Diesel)';
     rate = dieselRate;
-  } else if (hasPetrol && !hasDiesel) {
-    fuelType = 'Petrol';
+  } else if (hasPetrol) {
+    fuelType = 'MS (Petrol)';
     rate = petrolRate;
-  } else if (hasDiesel && hasPetrol) {
-    errors.push('❌ *Conflicting Fuel Type:* Please choose only *Diesel* OR *Petrol*, not both.');
+  } else if (hasCng) {
+    fuelType = 'CNG';
+    rate = cngRate;
   } else {
-    errors.push('❌ *Fuel Type Invalid:* Please specify either *Diesel* or *Petrol*. (Other fuel types are not supported).');
+    errors.push('❌ *Fuel Type Invalid:* Please specify fuel grade (*Diesel*, *Petrol*, *XP95*, or *CNG*).');
   }
 
-  // 3. Quantity (Litres) OR Price (Rupees) Validation
+  // 3. Quantity (Litres / KG) OR Price (Rupees) Validation
   const amountMatch =
-    clean.match(/(?:₹|rs\.?|inr|rupees|amount|price)\s*(\d[\d,]*)/i) ||
-    clean.match(/(\d[\d,]*)\s*(?:rs|inr|rupees)/i);
+    clean.match(/(?:₹|rs\.?|inr|rupees|amount|price)\s*(\d[\d,]*(?:\.\d+)?)/i) ||
+    clean.match(/(\d[\d,]*(?:\.\d+)?)\s*(?:rs|inr|rupees)/i);
 
-  const litresMatch = clean.match(/(\d[\d,]*)\s*(?:litres?|liters?|ltrs?|ltr|l)\b/i);
+  const qtyMatch = clean.match(/(\d[\d,]*(?:\.\d+)?)\s*(?:litres?|liters?|ltrs?|ltr|l|kg|kgs)\b/i);
 
   let litres = 0;
   let amount = 0;
 
-  if (amountMatch && litresMatch) {
-    litres = parseInt(litresMatch[1].replace(/,/g, ''), 10);
-    amount = parseInt(amountMatch[1].replace(/,/g, ''), 10);
+  if (amountMatch && qtyMatch) {
+    litres = Math.round(parseFloat(qtyMatch[1].replace(/,/g, '')) * 100) / 100;
+    amount = Math.round(parseFloat(amountMatch[1].replace(/,/g, '')) * 100) / 100;
   } else if (amountMatch) {
-    amount = parseInt(amountMatch[1].replace(/,/g, ''), 10);
-    litres = Math.round(amount / rate);
-  } else if (litresMatch) {
-    litres = parseInt(litresMatch[1].replace(/,/g, ''), 10);
-    amount = Math.round(litres * rate);
+    amount = Math.round(parseFloat(amountMatch[1].replace(/,/g, '')) * 100) / 100;
+    litres = Math.round((amount / rate) * 100) / 100;
+  } else if (qtyMatch) {
+    litres = Math.round(parseFloat(qtyMatch[1].replace(/,/g, '')) * 100) / 100;
+    amount = Math.round(litres * rate * 100) / 100;
   } else {
     let textWithoutPlate = clean;
     if (plateMatch) {
       textWithoutPlate = textWithoutPlate.replace(plateMatch[0], '');
     }
-    const rawNumbers = textWithoutPlate.match(/\b\d+\b/g) || [];
+    const rawNumbers = textWithoutPlate.match(/\b\d+(?:\.\d+)?\b/g) || [];
     if (rawNumbers.length > 0) {
       const nakedNum = rawNumbers[rawNumbers.length - 1];
-      errors.push(`❌ *Unit Missing for "${nakedNum}":* Please specify whether *${nakedNum}* is *Litres* (e.g. *${nakedNum} Litres*) OR *Rupees* (e.g. *${nakedNum} Rupees*).`);
+      errors.push(`❌ *Unit Missing for "${nakedNum}":* Please specify whether *${nakedNum}* is *Litres / KG* (e.g. *${nakedNum} Litres*) OR *Rupees* (e.g. *${nakedNum} Rupees*).`);
     } else {
-      errors.push('❌ *Quantity or Price Missing:* Please enter either quantity in litres (e.g. *1000 Litres*) OR price (e.g. *2200 Rupees*).');
+      errors.push('❌ *Quantity or Price Missing:* Please enter either quantity in litres (e.g. *1000 Litres*) OR price (e.g. *2500 Rupees*).');
     }
   }
 
@@ -181,7 +202,7 @@ function validateAndParseFuelOrder(text, activeRates = DEFAULT_RATES) {
         `_or_\n\n` +
         `MH04XZ1212\n` +
         `Petrol\n` +
-        `2200 Rupees`,
+        `2500 Rupees`,
     };
   }
 
@@ -190,8 +211,8 @@ function validateAndParseFuelOrder(text, activeRates = DEFAULT_RATES) {
     orderDetails: {
       vehicle_number: vehicleNumber,
       fuel_type: fuelType,
-      litres: String(litres),
-      amount: String(amount),
+      litres: litres.toFixed(2),
+      amount: amount.toFixed(2),
       rate_per_litre: rate,
     },
   };
@@ -213,6 +234,40 @@ function processConversation(waMessagePayload, masterRows = [], currentRates = n
 
   // 1. Extract customer name and number (with preloaded customer support)
   const customer = extractCustomerInfo(phone, chat, preloadedCustomer);
+
+  // Phone clean 10 digits
+  const cleanPhone = String(phone || '').replace(/\D/g, '').slice(-10);
+
+  // Strict Sheetal Parivahan Authorization Check
+  const isSheetRegistered = Boolean(preloadedCustomer && preloadedCustomer.isRegistered);
+  const isAuthorized =
+    !phone ||
+    phone === 'unknown_user' ||
+    cleanPhone.startsWith('000') ||
+    AUTHORIZED_PHONES.has(cleanPhone) ||
+    isSheetRegistered;
+
+  if (isAuthorized) {
+    if (!customer.company_name || customer.company_name === 'Valued Customer' || customer.company_name === 'Valued Fleet Partner') {
+      customer.company_name = preloadedCustomer?.company_name || 'Sheetal Parivahan';
+      customer.name = customer.company_name;
+    }
+  } else {
+    logger.warn(`Unauthorized access attempt from phone: ${phone} (${cleanPhone})`);
+    return {
+      user_id: `${phone}_${Date.now()}`,
+      phone,
+      customer,
+      state: 'access_denied',
+      action: 'send_text',
+      response:
+        `🚫 *Access Restricted: Gaurav Auto Care*\n\n` +
+        `Your mobile number (*+91 ${cleanPhone}*) is not authorized to place fuel orders.\n\n` +
+        `Only authorized fleet managers from registered partners (such as *Sheetal Parivahan*) are permitted to book fuel.\n\n` +
+        `📞 To authorize your number, please contact Gaurav Auto Care Support: *+91 93232 65076*`,
+      updated_at: new Date().toISOString(),
+    };
+  }
 
   // 2. Identify message type and content
   let textBody = '';
@@ -281,7 +336,7 @@ function processConversation(waMessagePayload, masterRows = [], currentRates = n
       state: 'awaiting_details',
       action: 'send_text',
       response:
-        `📞 *Gaurav Autocare Support & Dispatch Desk:*\n\n` +
+        `📞 *Gaurav Auto Care Support & Dispatch Desk:*\n\n` +
         `• Phone / WhatsApp: +91 93232 65076\n` +
         `• Email: admin@gauravauto.com\n` +
         `• Operating Hours: 24/7 Bulk Fuel Dispatch\n\n` +
@@ -295,31 +350,97 @@ function processConversation(waMessagePayload, masterRows = [], currentRates = n
   const currentState = isNewOrder ? 'initial' : previousSession.state || 'initial';
 
   // Case A: User completed the WhatsApp Flow Form (nfm_reply)
-  if (flowResponse && (flowResponse.vehicle_number || flowResponse.fuel_type || flowResponse.litres || flowResponse.amount)) {
+  if (
+    flowResponse &&
+    (flowResponse.vehicle_series ||
+      flowResponse.vehicle_number ||
+      flowResponse.vehicle_ly ||
+      flowResponse.vehicle_ju ||
+      flowResponse.vehicle_le ||
+      flowResponse.vehicle_lq ||
+      flowResponse.vehicle_kf ||
+      flowResponse.vehicle_mr ||
+      flowResponse.vehicle_mh ||
+      flowResponse.vehicle_ku ||
+      flowResponse.vehicle_other ||
+      flowResponse.fuel_type ||
+      flowResponse.is_full_tank)
+  ) {
     const ticketId = `GA-${Date.now().toString().slice(-6)}`;
-    const fuelType = (flowResponse.fuel_type || 'Diesel').trim();
-    const rate = fuelType.toLowerCase() === 'petrol'
-      ? (activeRates.Petrol || DEFAULT_RATES.Petrol)
-      : (activeRates.Diesel || DEFAULT_RATES.Diesel);
+    const rawFuel = String(flowResponse.fuel_type || 'HSD (Diesel)').trim();
 
-    let litres = parseFloat(flowResponse.litres || '0') || 0;
-    let amount = parseFloat(flowResponse.amount || '0') || 0;
+    // Resolve rate according to the selected fuel grade
+    let rate = parseFloat(activeRates.Diesel) || DEFAULT_RATES.Diesel;
+    const lowerFuel = rawFuel.toLowerCase();
+    const isCng = lowerFuel.includes('cng');
+    const unitLabel = isCng ? 'KG' : 'L';
 
-    if (litres > 0 && amount === 0) {
-      amount = Math.round(litres * rate);
-    } else if (amount > 0 && litres === 0) {
-      litres = Math.round(amount / rate);
-    } else if (litres === 0 && amount === 0) {
-      litres = 500;
-      amount = Math.round(litres * rate);
+    if (lowerFuel.includes('xp95')) {
+      rate = parseFloat(activeRates.XP95) || DEFAULT_RATES.XP95;
+    } else if (lowerFuel.includes('ms') || lowerFuel.includes('petrol')) {
+      rate = parseFloat(activeRates.Petrol) || DEFAULT_RATES.Petrol;
+    } else if (lowerFuel.includes('cng')) {
+      rate = parseFloat(activeRates.CNG) || DEFAULT_RATES.CNG;
+    } else if (lowerFuel.includes('hsd') || lowerFuel.includes('diesel')) {
+      rate = parseFloat(activeRates.Diesel) || DEFAULT_RATES.Diesel;
+    }
+
+    const resolvedVehicle = (
+      flowResponse.vehicle_ly ||
+      flowResponse.vehicle_ju ||
+      flowResponse.vehicle_le ||
+      flowResponse.vehicle_lq ||
+      flowResponse.vehicle_kf ||
+      flowResponse.vehicle_mr ||
+      flowResponse.vehicle_mh ||
+      flowResponse.vehicle_ku ||
+      flowResponse.vehicle_other ||
+      flowResponse.vehicle_number ||
+      'N/A'
+    ).toUpperCase().trim();
+
+    const isFullTank = String(flowResponse.is_full_tank || '').toLowerCase() === 'yes';
+    let litresDisplay = 'Full Tank';
+    let amountDisplay = 'Dispenser Cut-off';
+    let litresVal = 0;
+    let amountVal = 0;
+
+    if (!isFullTank) {
+      const inputLitres = parseFloat(flowResponse.litres || '0') || 0;
+      const inputAmount = parseFloat(flowResponse.amount || '0') || 0;
+
+      if (inputLitres > 0) {
+        // User entered Quantity: round to 2 decimals
+        litresVal = Math.round(inputLitres * 100) / 100;
+        // Total Amount = Quantity * Rate, rounded to 2 decimals (paise)
+        amountVal = Math.round(litresVal * rate * 100) / 100;
+      } else if (inputAmount > 0) {
+        // User entered Amount: round to 2 decimals
+        amountVal = Math.round(inputAmount * 100) / 100;
+        // Total Quantity = Amount / Rate, rounded to 2 decimals
+        litresVal = Math.round((amountVal / rate) * 100) / 100;
+      } else {
+        // Fallback default if neither provided
+        litresVal = 50.00;
+        amountVal = Math.round(litresVal * rate * 100) / 100;
+      }
+
+      litresDisplay = `${litresVal.toFixed(2)} ${unitLabel}`;
+      amountDisplay = `₹${amountVal.toFixed(2)}`;
     }
 
     const orderDetails = {
-      vehicle_number: (flowResponse.vehicle_number || 'N/A').toUpperCase().trim(),
-      fuel_type: fuelType,
-      litres: String(litres),
-      amount: String(amount),
+      vehicle_number: resolvedVehicle,
+      fuel_type: rawFuel,
+      is_full_tank: isFullTank ? 'Yes' : 'No',
+      litres: isFullTank ? 'Full Tank' : litresVal.toFixed(2),
+      amount: isFullTank ? 'Cut-Off' : amountVal.toFixed(2),
+      litres_display: litresDisplay,
+      amount_display: amountDisplay,
       rate_per_litre: rate,
+      is_enroute: String(flowResponse.is_enroute || 'no').toLowerCase() === 'yes' ? 'Yes' : 'No',
+      oil_material: flowResponse.oil_material || 'None',
+      remarks: (flowResponse.remarks || '').trim() || 'N/A',
     };
 
     const ticketText = generateOrderTicket({ ticketId, customer, orderDetails });
@@ -356,7 +477,7 @@ function processConversation(waMessagePayload, masterRows = [], currentRates = n
       phone,
       customer,
       state: 'awaiting_details',
-      action: 'send_welcome',
+      action: 'send_fuel_flow',
       response: welcomeText,
       data: JSON.stringify({ customer }),
       updated_at: new Date().toISOString(),
