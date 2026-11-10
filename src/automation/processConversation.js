@@ -15,6 +15,9 @@ const AUTHORIZED_PHONES = new Set([
   '9833611124',
   '7985916674',
   '9820500159',
+  '9820216600',
+  '9867025711',
+  '8976976900',
 ]);
 
 // In-memory session store so bot works without database setup
