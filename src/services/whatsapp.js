@@ -164,6 +164,120 @@ async function sendFuelOrderFlow(to, flowId, customerInfo = {}, vehicleOptions =
 }
 
 /**
+ * Sends the Add Vehicle Flow
+ */
+async function sendAddVehicleFlow(to, flowId, customerInfo = {}) {
+  const companyName = customerInfo.company_name || customerInfo.company || 'Sheetal Parivahan';
+  return callGraphApi({
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to,
+    type: 'interactive',
+    interactive: {
+      type: 'flow',
+      header: { type: 'text', text: 'Gaurav Auto Care' },
+      body: {
+        text:
+          `🚛 *Vehicle Management — Add Vehicle*\n\n` +
+          `🏢 *Fleet Partner:* ${companyName}\n\n` +
+          `Please tap below to register a new commercial truck to your active fleet:`,
+      },
+      footer: { text: 'Gaurav Auto Care Fleet Desk' },
+      action: {
+        name: 'flow',
+        parameters: {
+          flow_message_version: '3',
+          flow_token: `add_veh_${to}_${Date.now()}`,
+          flow_id: flowId,
+          flow_cta: '➕ Add Vehicle',
+          flow_action: 'navigate',
+          flow_action_payload: {
+            screen: 'ADD_VEHICLE',
+            data: { company_name: companyName },
+          },
+        },
+      },
+    },
+  });
+}
+
+/**
+ * Sends the Edit Vehicle Flow
+ */
+async function sendEditVehicleFlow(to, flowId, customerInfo = {}) {
+  const companyName = customerInfo.company_name || customerInfo.company || 'Sheetal Parivahan';
+  return callGraphApi({
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to,
+    type: 'interactive',
+    interactive: {
+      type: 'flow',
+      header: { type: 'text', text: 'Gaurav Auto Care' },
+      body: {
+        text:
+          `🚛 *Vehicle Management — Edit Vehicle*\n\n` +
+          `🏢 *Fleet Partner:* ${companyName}\n\n` +
+          `Please tap below to select and correct an existing vehicle number:`,
+      },
+      footer: { text: 'Gaurav Auto Care Fleet Desk' },
+      action: {
+        name: 'flow',
+        parameters: {
+          flow_message_version: '3',
+          flow_token: `edit_veh_${to}_${Date.now()}`,
+          flow_id: flowId,
+          flow_cta: '✏️ Edit Vehicle',
+          flow_action: 'navigate',
+          flow_action_payload: {
+            screen: 'EDIT_VEHICLE',
+            data: { company_name: companyName },
+          },
+        },
+      },
+    },
+  });
+}
+
+/**
+ * Sends the Delete Vehicle Flow
+ */
+async function sendDeleteVehicleFlow(to, flowId, customerInfo = {}) {
+  const companyName = customerInfo.company_name || customerInfo.company || 'Sheetal Parivahan';
+  return callGraphApi({
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to,
+    type: 'interactive',
+    interactive: {
+      type: 'flow',
+      header: { type: 'text', text: 'Gaurav Auto Care' },
+      body: {
+        text:
+          `🚛 *Vehicle Management — Delete Vehicle*\n\n` +
+          `🏢 *Fleet Partner:* ${companyName}\n\n` +
+          `Please tap below to select a vehicle to remove from active fleet booking:`,
+      },
+      footer: { text: 'Gaurav Auto Care Fleet Desk' },
+      action: {
+        name: 'flow',
+        parameters: {
+          flow_message_version: '3',
+          flow_token: `del_veh_${to}_${Date.now()}`,
+          flow_id: flowId,
+          flow_cta: '🗑️ Delete Vehicle',
+          flow_action: 'navigate',
+          flow_action_payload: {
+            screen: 'DELETE_VEHICLE',
+            data: { company_name: companyName },
+          },
+        },
+      },
+    },
+  });
+}
+
+/**
  * Sends a native WhatsApp interactive button message (up to 3 buttons).
  */
 async function sendInteractiveButtons(to, headerText, bodyText, footerText, buttons) {
@@ -258,6 +372,9 @@ module.exports = {
   sendCtaButtons,
   sendFlowDatePicker,
   sendFuelOrderFlow,
+  sendAddVehicleFlow,
+  sendEditVehicleFlow,
+  sendDeleteVehicleFlow,
   sendInteractiveButtons,
   sendInteractiveList,
   markAsReadAndTyping,

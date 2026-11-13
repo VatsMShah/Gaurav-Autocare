@@ -430,6 +430,8 @@ async function saveFuelTruckOrder(order) {
           fuel_type: order.fuelType || order.fuel_type || 'Diesel',
           litres: parseFloat(order.litres) || 0,
           estimated_amount: parseFloat(order.amount || order.estimated_amount) || 0,
+          driver_assigned: order.driverName ? `${order.driverName}${order.driverNumber ? ' (' + order.driverNumber + ')' : ''}` : (order.driver_assigned || null),
+          notes: order.remarks ? `Driver: ${order.driverName || 'N/A'} | Number: ${order.driverNumber || 'N/A'} | ${order.remarks}` : `Driver: ${order.driverName || 'N/A'} | Number: ${order.driverNumber || 'N/A'}`,
           order_status: order.orderStatus || 'confirmed',
           payment_status: order.paymentStatus || 'pending',
           source: 'whatsapp_flow',

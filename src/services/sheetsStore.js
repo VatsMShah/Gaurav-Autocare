@@ -68,7 +68,7 @@ async function getSheet(tabTitle, defaultHeaders = []) {
 /**
  * Helper to call Google Apps Script Webhook safely with timeout
  */
-async function callAppsScript(payload, timeoutMs = 7500) {
+async function callAppsScript(payload, timeoutMs = 15000) {
   if (!config.google?.webhookUrl) return null;
 
   const controller = new AbortController();
@@ -301,10 +301,239 @@ async function upsertRow(tabTitle, matchColumn, data) {
   return newRow.toObject();
 }
 
+const managerPhoneCache = {
+  data: new Set(['9323265076', '9820500159']),
+  lastFetched: 0,
+  ttl: 5 * 60 * 1000, // 5 minutes cache
+};
+
+/**
+ * Fetch Manager access phone numbers directly from Google Sheets 'customers' tab (Column B)
+ */
+async function getManagerPhones() {
+  const now = Date.now();
+  if (managerPhoneCache.data.size > 0 && (now - managerPhoneCache.lastFetched) < managerPhoneCache.ttl) {
+    return managerPhoneCache.data;
+  }
+
+  if (!config.google?.webhookUrl && (!config.google?.serviceAccountEmail || !config.google?.privateKey)) {
+    return managerPhoneCache.data;
+  }
+
+  try {
+    const rows = await findRows('customers', 'Company Name', 'Sheetal Parivahan');
+    if (Array.isArray(rows) && rows.length > 0) {
+      const newSet = new Set();
+      for (const row of rows) {
+        const raw = String(
+          row['Manager access Phone Numbers'] ||
+          row['manager_access_phone_numbers'] ||
+          row['manager_phones'] ||
+          ''
+        );
+        const matches = raw.match(/\d{10,12}/g) || [];
+        for (const m of matches) {
+          newSet.add(m.slice(-10));
+        }
+        const singleClean = raw.replace(/\D/g, '');
+        if (singleClean.length >= 10) {
+          newSet.add(singleClean.slice(-10));
+        }
+      }
+
+      if (newSet.size > 0) {
+        managerPhoneCache.data = newSet;
+        managerPhoneCache.lastFetched = now;
+        logger.info('👥 Synced Manager Phones from Google Sheet Column B:', Array.from(newSet));
+      }
+    }
+  } catch (err) {
+    logger.warn('Failed to fetch manager phones from Google Sheet, using cache/fallback:', err.message);
+  }
+
+  return managerPhoneCache.data;
+}
+
+const DEFAULT_MANAGER_PHONES = '9323265076';
+const DEFAULT_AUTH_PHONES = '9076021348, 7400062501, 9324993903, 7738022509, 8291083855, 9920981780, 7777030315, 9594780757, 9324983249, 9833611124, 7985916674, 9820500159, 9820216600, 9867025711, 8976976900, 9323265076';
+
+/**
+ * Add a new vehicle to fleet_vehicles tab and update customers tab
+ */
+async function addVehicle(vehicleNo, companyName = 'Sheetal Parivahan') {
+  const clean = String(vehicleNo || '').toUpperCase().replace(/[\s-]/g, '');
+  const nowStr = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+
+  // Invalidate in-memory cache
+  customerCache.clear();
+
+  // 1. Save to fleet_vehicles tab
+  await upsertRow('fleet_vehicles', 'Vehicle No', {
+    'Company Name': companyName,
+    'Vehicle No': clean,
+    'Last Updated (IST)': nowStr,
+  });
+
+  // 2. Update customers tab Column D while strictly preserving Columns B and C
+  try {
+    const custRows = await findRows('customers', 'Company Name', companyName);
+    const existing = custRows && custRows.length > 0 ? custRows[0] : {};
+    let currentVehicles = String(existing['Vehicle Numbers'] || '').split(',').map((s) => s.trim()).filter(Boolean);
+    if (!currentVehicles.includes(clean)) {
+      currentVehicles.push(clean);
+    }
+
+    const mgrPhones = existing['Manager access Phone Numbers'] || DEFAULT_MANAGER_PHONES;
+    const authPhones = existing['Authorized Phone Numbers'] || DEFAULT_AUTH_PHONES;
+
+    await upsertRow('customers', 'Company Name', {
+      'Company Name': companyName,
+      'Manager access Phone Numbers': mgrPhones,
+      'Authorized Phone Numbers': authPhones,
+      'Vehicle Numbers': currentVehicles.join(', '),
+      'Last Updated (IST)': nowStr,
+    });
+  } catch (err) {
+    logger.warn('Failed to update customers tab with new vehicle:', err.message);
+  }
+
+  customerCache.clear();
+  return { success: true, vehicleNo: clean };
+}
+
+/**
+ * Edit an existing vehicle in fleet_vehicles and customers tab
+ */
+async function editVehicle(oldVehicleNo, newVehicleNo, companyName = 'Sheetal Parivahan') {
+  const cleanOld = String(oldVehicleNo || '').toUpperCase().replace(/[\s-]/g, '');
+  const cleanNew = String(newVehicleNo || '').toUpperCase().replace(/[\s-]/g, '');
+  const nowStr = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+
+  // Invalidate in-memory cache
+  customerCache.clear();
+
+  // 1. Try atomic Apps Script action (updates fleet_vehicles row and customers Column D in one step)
+  if (config.google?.webhookUrl) {
+    try {
+      const res = await callAppsScript({
+        action: 'edit_vehicle',
+        oldVehicleNo: cleanOld,
+        newVehicleNo: cleanNew,
+        companyName,
+      }, 15000);
+      if (res && res.status === 'success' && (res.updatedFleet || res.updatedCust)) {
+        logger.info(`✅ Atomic edit_vehicle succeeded: ${cleanOld} -> ${cleanNew}`);
+        customerCache.clear();
+        return { success: true, oldVehicleNo: cleanOld, newVehicleNo: cleanNew };
+      }
+    } catch (e) {
+      logger.warn('Atomic edit_vehicle call failed, falling back:', e.message);
+    }
+  }
+
+  // 2. Fallback: Update fleet_vehicles tab
+  await upsertRow('fleet_vehicles', 'Vehicle No', {
+    'Company Name': companyName,
+    'Vehicle No': cleanNew,
+    'Last Updated (IST)': nowStr,
+  });
+
+  // 3. Update customers tab Column D while strictly preserving Columns B and C
+  try {
+    const custRows = await findRows('customers', 'Company Name', companyName);
+    const existing = custRows && custRows.length > 0 ? custRows[0] : {};
+    let currentVehicles = String(existing['Vehicle Numbers'] || '').split(',').map((s) => s.trim()).filter(Boolean);
+    currentVehicles = currentVehicles.map((v) => (v === cleanOld ? cleanNew : v));
+    if (!currentVehicles.includes(cleanNew)) {
+      currentVehicles.push(cleanNew);
+    }
+
+    const mgrPhones = existing['Manager access Phone Numbers'] || DEFAULT_MANAGER_PHONES;
+    const authPhones = existing['Authorized Phone Numbers'] || DEFAULT_AUTH_PHONES;
+
+    await upsertRow('customers', 'Company Name', {
+      'Company Name': companyName,
+      'Manager access Phone Numbers': mgrPhones,
+      'Authorized Phone Numbers': authPhones,
+      'Vehicle Numbers': currentVehicles.join(', '),
+      'Last Updated (IST)': nowStr,
+    });
+  } catch (err) {
+    logger.warn('Failed to update customers tab on edit vehicle:', err.message);
+  }
+
+  customerCache.clear();
+  return { success: true, oldVehicleNo: cleanOld, newVehicleNo: cleanNew };
+}
+
+/**
+ * Delete / Deactivate a vehicle from fleet_vehicles and customers tab
+ */
+async function deleteVehicle(vehicleNo, companyName = 'Sheetal Parivahan') {
+  const clean = String(vehicleNo || '').toUpperCase().replace(/[\s-]/g, '');
+  const nowStr = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+
+  // Invalidate in-memory cache
+  customerCache.clear();
+
+  // 1. Try atomic Apps Script action (updates fleet_vehicles row and customers Column D in one step)
+  if (config.google?.webhookUrl) {
+    try {
+      const res = await callAppsScript({
+        action: 'delete_vehicle',
+        vehicleNo: clean,
+        companyName,
+      }, 15000);
+      if (res && res.status === 'success' && (res.deletedFleet || res.deletedCust)) {
+        logger.info(`✅ Atomic delete_vehicle succeeded: ${clean}`);
+        customerCache.clear();
+        return { success: true, vehicleNo: clean };
+      }
+    } catch (e) {
+      logger.warn('Atomic delete_vehicle call failed, falling back:', e.message);
+    }
+  }
+
+  // 2. Fallback: Soft delete in fleet_vehicles: mark inactive
+  await upsertRow('fleet_vehicles', 'Vehicle No', {
+    'Company Name': companyName,
+    'Vehicle No': clean + ' (INACTIVE)',
+    'Last Updated (IST)': nowStr,
+  });
+
+  // 3. Remove from customers tab Column D while strictly preserving Columns B and C
+  try {
+    const custRows = await findRows('customers', 'Company Name', companyName);
+    const existing = custRows && custRows.length > 0 ? custRows[0] : {};
+    let currentVehicles = String(existing['Vehicle Numbers'] || '').split(',').map((s) => s.trim()).filter(Boolean);
+    currentVehicles = currentVehicles.filter((v) => v !== clean);
+
+    const mgrPhones = existing['Manager access Phone Numbers'] || DEFAULT_MANAGER_PHONES;
+    const authPhones = existing['Authorized Phone Numbers'] || DEFAULT_AUTH_PHONES;
+
+    await upsertRow('customers', 'Company Name', {
+      'Company Name': companyName,
+      'Manager access Phone Numbers': mgrPhones,
+      'Authorized Phone Numbers': authPhones,
+      'Vehicle Numbers': currentVehicles.join(', '),
+      'Last Updated (IST)': nowStr,
+    });
+  } catch (err) {
+    logger.warn('Failed to update customers tab on delete vehicle:', err.message);
+  }
+
+  customerCache.clear();
+  return { success: true, vehicleNo: clean };
+}
+
 module.exports = {
   getDoc,
   findRows,
   upsertRow,
   getFuelRates,
   getCustomerByPhone,
+  getManagerPhones,
+  addVehicle,
+  editVehicle,
+  deleteVehicle,
 };

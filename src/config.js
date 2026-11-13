@@ -21,6 +21,9 @@ module.exports = {
     phoneNumberId: required('WHATSAPP_PHONE_NUMBER_ID'),
     graphApiVersion: process.env.WHATSAPP_GRAPH_API_VERSION || 'v20.0',
     flowId: (process.env.WHATSAPP_FLOW_ID || '').trim(),
+    addVehicleFlowId: (process.env.WHATSAPP_ADD_VEHICLE_FLOW_ID || '2592337911241483').trim(),
+    editVehicleFlowId: (process.env.WHATSAPP_EDIT_VEHICLE_FLOW_ID || '1666831991518273').trim(),
+    deleteVehicleFlowId: (process.env.WHATSAPP_DELETE_VEHICLE_FLOW_ID || '1511816160829597').trim(),
   },
   supabase: {
     url: required('SUPABASE_URL'),

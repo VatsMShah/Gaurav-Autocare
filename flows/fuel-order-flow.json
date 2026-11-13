@@ -1,5 +1,5 @@
 {
-  "version": "6.0",
+  "version": "6.2",
   "screens": [
     {
       "id": "FUEL_ORDER_FORM",
@@ -1281,26 +1281,32 @@
             ]
           },
           {
-            "type": "RadioButtonsGroup",
-            "name": "is_enroute",
-            "label": "Q5. Enroute",
+            "type": "TextInput",
+            "name": "driver_name",
+            "label": "Q5a. Driver Name",
             "required": true,
-            "data-source": [
-              {
-                "id": "yes",
-                "title": "Yes"
-              },
-              {
-                "id": "no",
-                "title": "No"
-              }
-            ]
+            "input-type": "text",
+            "min-chars": 2,
+            "max-chars": 50,
+            "pattern": "^[a-zA-Z\\s.'-]+$",
+            "helper-text": "Letters only (e.g. Ramesh Kumar)",
+            "error-message": "Driver name must contain letters only"
+          },
+          {
+            "type": "TextInput",
+            "name": "driver_number",
+            "label": "Q5b. Driver Number",
+            "required": true,
+            "input-type": "phone",
+            "min-chars": 10,
+            "max-chars": 10,
+            "helper-text": "10-digit mobile number (e.g. 9820500159)"
           },
           {
             "type": "Dropdown",
             "name": "oil_material",
             "label": "Q6. Oil / Lubricant",
-            "required": true,
+            "required": false,
             "data-source": [
               {
                 "id": "NONE",
@@ -1601,7 +1607,8 @@
                 "order_by": "${form.order_by}",
                 "litres": "${form.litres}",
                 "amount": "${form.amount}",
-                "is_enroute": "${form.is_enroute}",
+                "driver_name": "${form.driver_name}",
+                "driver_number": "${form.driver_number}",
                 "oil_material": "${form.oil_material}",
                 "remarks": "${form.remarks}"
               }

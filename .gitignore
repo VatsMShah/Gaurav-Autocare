@@ -7,3 +7,5 @@ data/
 .github/
 cloudflared
 auth_baileys/
+ngrok
+scratch/

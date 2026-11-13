@@ -52,6 +52,13 @@ async function saveFuelTruckOrder(order) {
       litres: isFullTank ? 'Full Tank' : (parseFloat(order.litres) || 0),
       rate_per_litre: parseFloat(order.ratePerLitre || order.rate_per_litre) || 0,
       estimated_amount: isFullTank ? 'Cut-Off' : (parseFloat(order.amount || order.estimated_amount) || 0),
+      driver_name: order.driverName || order.driver_name || '',
+      driver_number: order.driverNumber || order.driver_number || order.driverPhone || order.driver_phone || '',
+      'Driver Name': order.driverName || order.driver_name || '',
+      'Driver Number': order.driverNumber || order.driver_number || order.driverPhone || order.driver_phone || '',
+      'Oil lubricant': order.oilMaterial || order.oil_material || 'None',
+      'Oil / Lubricant': order.oilMaterial || order.oil_material || 'None',
+      'Remarks': order.remarks || '',
       is_enroute: order.isEnroute || order.is_enroute || 'No',
       oil_material: order.oilMaterial || order.oil_material || 'None',
       remarks: order.remarks || '',
@@ -83,6 +90,16 @@ async function getFuelRates() {
 async function getCustomerByPhone(phone) {
   if (!isConfigured() || !phone) return null;
   return store.getCustomerByPhone(phone);
+}
+
+/**
+ * Fetch Manager access phone numbers directly from Google Sheets 'customers' tab
+ */
+async function getManagerPhones() {
+  if (!isConfigured()) {
+    return new Set(['9323265076', '9820500159']);
+  }
+  return store.getManagerPhones();
 }
 
 /**
@@ -210,11 +227,30 @@ async function saveSupportRow(row) {
   return store.upsertRow('Support', 'user_id', row);
 }
 
+async function addVehicle(vehicleNo, companyName) {
+  if (!isConfigured()) return { success: true, vehicleNo };
+  return store.addVehicle(vehicleNo, companyName);
+}
+
+async function editVehicle(oldVehicleNo, newVehicleNo, companyName) {
+  if (!isConfigured()) return { success: true, oldVehicleNo, newVehicleNo };
+  return store.editVehicle(oldVehicleNo, newVehicleNo, companyName);
+}
+
+async function deleteVehicle(vehicleNo, companyName) {
+  if (!isConfigured()) return { success: true, vehicleNo };
+  return store.deleteVehicle(vehicleNo, companyName);
+}
+
 module.exports = {
   isConfigured,
   saveFuelTruckOrder,
   getFuelRates,
   getCustomerByPhone,
+  getManagerPhones,
+  addVehicle,
+  editVehicle,
+  deleteVehicle,
   saveCustomer,
   saveFuelRate,
   saveBotSession,

@@ -127,12 +127,18 @@ async function handleIncomingMessage(value) {
     logger.debug('Rates fetch fallback: ' + rateErr.message);
   }
 
-  // 3. Look up customer profile (cached in memory)
+  // 3. Look up customer profile & manager phones (cached in memory)
   let preloadedCustomer = null;
+  let dynamicManagerPhones = null;
   try {
     preloadedCustomer = await sheets.getCustomerByPhone(phone);
   } catch (custErr) {
     logger.debug('Sheet customer lookup fallback: ' + custErr.message);
+  }
+  try {
+    dynamicManagerPhones = await sheets.getManagerPhones();
+  } catch (mgrErr) {
+    logger.debug('Sheet manager lookup fallback: ' + mgrErr.message);
   }
 
   // 4. Fast session lookup (Memory cache first, Supabase fallback)
@@ -169,7 +175,8 @@ async function handleIncomingMessage(value) {
     value,
     sessionRecord ? [sessionRecord] : [],
     activeRates,
-    preloadedCustomer
+    preloadedCustomer,
+    dynamicManagerPhones
   );
 
   // Update in-memory session store immediately
@@ -197,6 +204,8 @@ async function handleIncomingMessage(value) {
         amount: output.orderDetails.amount,
         ratePerLitre: output.orderDetails.rate_per_litre,
         isFullTank: output.orderDetails.is_full_tank,
+        driverName: output.orderDetails.driver_name,
+        driverNumber: output.orderDetails.driver_number,
         isEnroute: output.orderDetails.is_enroute,
         oilMaterial: output.orderDetails.oil_material,
         remarks: output.orderDetails.remarks,
@@ -228,7 +237,12 @@ async function handleIncomingMessage(value) {
       logger.warn('Failed to send interactive list, falling back to text', listErr);
       await whatsapp.sendText(output.phone, output.response);
     }
-  } else if (output.action === 'send_fuel_buttons' || output.action === 'send_litres_buttons') {
+  } else if (
+    output.action === 'send_fuel_buttons' ||
+    output.action === 'send_litres_buttons' ||
+    output.action === 'send_manager_menu' ||
+    output.action === 'send_vehicle_menu'
+  ) {
     try {
       await whatsapp.sendInteractiveButtons(
         output.phone,
@@ -240,6 +254,51 @@ async function handleIncomingMessage(value) {
       logger.info(`Sent Interactive Buttons (${output.action}) to ` + output.phone);
     } catch (btnErr) {
       logger.warn('Failed to send interactive buttons, falling back to text', btnErr);
+      await whatsapp.sendText(output.phone, output.response);
+    }
+  } else if (output.action === 'send_add_vehicle_flow') {
+    try {
+      await whatsapp.sendAddVehicleFlow(output.phone, config.whatsapp.addVehicleFlowId, output.customer);
+      logger.info('Sent WhatsApp Add Vehicle Flow to ' + output.phone);
+    } catch (flowErr) {
+      logger.warn('Failed to send Add Vehicle Flow, falling back to text', flowErr);
+      await whatsapp.sendText(output.phone, output.response);
+    }
+  } else if (output.action === 'send_edit_vehicle_flow') {
+    try {
+      await whatsapp.sendEditVehicleFlow(output.phone, config.whatsapp.editVehicleFlowId, output.customer);
+      logger.info('Sent WhatsApp Edit Vehicle Flow to ' + output.phone);
+    } catch (flowErr) {
+      logger.warn('Failed to send Edit Vehicle Flow, falling back to text', flowErr);
+      await whatsapp.sendText(output.phone, output.response);
+    }
+  } else if (output.action === 'send_delete_vehicle_flow') {
+    try {
+      await whatsapp.sendDeleteVehicleFlow(output.phone, config.whatsapp.deleteVehicleFlowId, output.customer);
+      logger.info('Sent WhatsApp Delete Vehicle Flow to ' + output.phone);
+    } catch (flowErr) {
+      logger.warn('Failed to send Delete Vehicle Flow, falling back to text', flowErr);
+      await whatsapp.sendText(output.phone, output.response);
+    }
+  } else if (
+    output.action === 'save_and_confirm_add_vehicle' ||
+    output.action === 'save_and_confirm_edit_vehicle' ||
+    output.action === 'save_and_confirm_delete_vehicle'
+  ) {
+    try {
+      await whatsapp.sendInteractiveButtons(
+        output.phone,
+        output.header || 'Gaurav Auto Care',
+        output.response,
+        output.footer || 'Gaurav Auto Care Fleet Manager',
+        output.buttons || [
+          { id: 'btn_book_fuel', title: '📋 Book Fuel' },
+          { id: 'btn_modify_vehicle', title: '🚛 Modify Vehicle' },
+        ]
+      );
+      logger.info(`Sent confirmation buttons (${output.action}) to ` + output.phone);
+    } catch (btnErr) {
+      logger.warn('Failed to send confirmation buttons, falling back to text', btnErr);
       await whatsapp.sendText(output.phone, output.response);
     }
   } else if (output.action === 'send_fuel_flow' || output.action === 'send_welcome') {
@@ -299,6 +358,16 @@ async function handleIncomingMessage(value) {
         if (orderRecord) {
           await sheets.saveFuelTruckOrder(orderRecord);
           logger.info(`✅ Order #${orderRecord.ticketId} saved to Google Sheet`);
+        }
+        if (output.action === 'save_and_confirm_add_vehicle' && output.vehicleNumber) {
+          await sheets.addVehicle(output.vehicleNumber, output.customer?.company_name || 'Sheetal Parivahan');
+          logger.info(`✅ Registered new vehicle ${output.vehicleNumber} in Google Sheet`);
+        } else if (output.action === 'save_and_confirm_edit_vehicle' && output.oldVehicleNumber && output.newVehicleNumber) {
+          await sheets.editVehicle(output.oldVehicleNumber, output.newVehicleNumber, output.customer?.company_name || 'Sheetal Parivahan');
+          logger.info(`✅ Updated vehicle ${output.oldVehicleNumber} -> ${output.newVehicleNumber} in Google Sheet`);
+        } else if (output.action === 'save_and_confirm_delete_vehicle' && output.vehicleNumber) {
+          await sheets.deleteVehicle(output.vehicleNumber, output.customer?.company_name || 'Sheetal Parivahan');
+          logger.info(`✅ Removed vehicle ${output.vehicleNumber} from Google Sheet`);
         }
       } catch (sheetErr) {
         logger.warn('Google Sheet persist error:', sheetErr.message);

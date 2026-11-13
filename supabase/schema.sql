@@ -84,6 +84,8 @@ CREATE TABLE IF NOT EXISTS public.fuel_truck_orders (
   payment_status VARCHAR(50) NOT NULL DEFAULT 'pending' 
     CHECK (payment_status IN ('pending', 'paid', 'credit', 'partial')),
   delivery_type VARCHAR(50) DEFAULT 'truck_dispense',
+  driver_name VARCHAR(255),
+  driver_number VARCHAR(50),
   driver_assigned VARCHAR(255),
   notes TEXT,
   source VARCHAR(50) DEFAULT 'whatsapp_flow',

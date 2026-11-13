@@ -30,6 +30,10 @@ var TABLE_CONFIG = {
       'Quantity (L)',
       'Rate (₹/L)',
       'Total Amount (₹)',
+      'Driver Name',
+      'Driver Number',
+      'Oil / Lubricant',
+      'Remarks',
       'Order Status',
       'Payment Status',
       'Source',
@@ -45,6 +49,10 @@ var TABLE_CONFIG = {
       'litres',
       'rate_per_litre',
       'estimated_amount',
+      'driver_name',
+      'driver_number',
+      'oil_material',
+      'remarks',
       'order_status',
       'payment_status',
       'source',
@@ -55,24 +63,20 @@ var TABLE_CONFIG = {
   customers: {
     title: 'customers',
     headers: [
-      'Phone Number',
-      'Customer / Fleet Name',
       'Company Name',
-      'Email',
-      'GSTIN',
-      'Created At (IST)',
-      'Updated At (IST)'
+      'Manager access Phone Numbers',
+      'Authorized Phone Numbers',
+      'Vehicle Numbers',
+      'Last Updated (IST)'
     ],
     keys: [
-      'phone',
-      'name',
       'company_name',
-      'email',
-      'gstin',
-      'created_at',
+      'manager_access_phone_numbers',
+      'authorized_phone_numbers',
+      'vehicle_numbers',
       'updated_at'
     ],
-    matchKey: 'phone'
+    matchKey: 'company_name'
   },
   fuel_rates: {
     title: 'fuel_rates',
@@ -442,6 +446,115 @@ function doPost(e) {
       return respondJson({ status: 'success', rows: foundRows });
     }
 
+    if (action === 'sync_fleet_tab') {
+      syncFleetVehiclesWithCustomers();
+      return respondJson({ status: 'success', action: 'sync_fleet_tab' });
+    }
+
+    // ACTION: edit_vehicle (Replaces old vehicle number with new vehicle number)
+    if (action === 'edit_vehicle') {
+      var oldVeh = String(payload.oldVehicleNo || '').trim().toUpperCase().replace(/[\s-]/g, '');
+      var newVeh = String(payload.newVehicleNo || '').trim().toUpperCase().replace(/[\s-]/g, '');
+      var cName = payload.companyName || 'Sheetal Parivahan';
+      var nowStr = formatToIST(new Date());
+      var updatedFleet = false;
+      var updatedCust = false;
+
+      // 1. Update in fleet_vehicles tab (search for oldVeh, replace with newVeh)
+      var fvSheet = ss.getSheetByName('fleet_vehicles');
+      if (fvSheet && fvSheet.getLastRow() > 1) {
+        var vColIdx = findColumnIndex(fvSheet, 'Vehicle No');
+        if (vColIdx !== -1) {
+          var fvData = fvSheet.getRange(2, vColIdx + 1, fvSheet.getLastRow() - 1, 1).getValues();
+          for (var r = 0; r < fvData.length; r++) {
+            var cellVal = String(fvData[r][0]).trim().toUpperCase().replace(/[\s-]/g, '');
+            if (cellVal === oldVeh) {
+              fvSheet.getRange(r + 2, vColIdx + 1).setValue(newVeh);
+              var uCol = findColumnIndex(fvSheet, 'Last Updated (IST)');
+              if (uCol !== -1) fvSheet.getRange(r + 2, uCol + 1).setValue(nowStr);
+              updatedFleet = true;
+              break;
+            }
+          }
+        }
+      }
+
+      // 2. Update in customers tab (Column D)
+      var custSheet = ss.getSheetByName('customers');
+      if (custSheet && custSheet.getLastRow() > 1) {
+        var cIdx = findColumnIndex(custSheet, 'Company Name');
+        var vListIdx = findColumnIndex(custSheet, 'Vehicle Numbers');
+        if (cIdx !== -1 && vListIdx !== -1) {
+          var cData = custSheet.getRange(2, 1, custSheet.getLastRow() - 1, custSheet.getLastColumn()).getValues();
+          for (var i = 0; i < cData.length; i++) {
+            if (String(cData[i][cIdx]).trim() === cName) {
+              var vList = String(cData[i][vListIdx] || '').split(',').map(function(s) { return s.trim(); }).filter(Boolean);
+              vList = vList.map(function(v) { return v.replace(/[\s-]/g, '') === oldVeh ? newVeh : v; });
+              if (vList.indexOf(newVeh) === -1) vList.push(newVeh);
+              custSheet.getRange(i + 2, vListIdx + 1).setValue(vList.join(', '));
+              var cuCol = findColumnIndex(custSheet, 'Last Updated (IST)');
+              if (cuCol !== -1) custSheet.getRange(i + 2, cuCol + 1).setValue(nowStr);
+              updatedCust = true;
+              break;
+            }
+          }
+        }
+      }
+
+      return respondJson({ status: 'success', action: 'edit_vehicle', updatedFleet: updatedFleet, updatedCust: updatedCust, oldVehicleNo: oldVeh, newVehicleNo: newVeh });
+    }
+
+    // ACTION: delete_vehicle (Removes/deactivates vehicle from fleet_vehicles and customers tab)
+    if (action === 'delete_vehicle') {
+      var targetVeh = String(payload.vehicleNo || '').trim().toUpperCase().replace(/[\s-]/g, '');
+      var cName = payload.companyName || 'Sheetal Parivahan';
+      var nowStr = formatToIST(new Date());
+      var deletedFleet = false;
+      var deletedCust = false;
+
+      // 1. Mark inactive in fleet_vehicles tab
+      var fvSheet = ss.getSheetByName('fleet_vehicles');
+      if (fvSheet && fvSheet.getLastRow() > 1) {
+        var vColIdx = findColumnIndex(fvSheet, 'Vehicle No');
+        if (vColIdx !== -1) {
+          var fvData = fvSheet.getRange(2, vColIdx + 1, fvSheet.getLastRow() - 1, 1).getValues();
+          for (var r = 0; r < fvData.length; r++) {
+            var cellVal = String(fvData[r][0]).trim().toUpperCase().replace(/[\s-]/g, '');
+            if (cellVal === targetVeh) {
+              fvSheet.getRange(r + 2, vColIdx + 1).setValue(targetVeh + ' (INACTIVE)');
+              var uCol = findColumnIndex(fvSheet, 'Last Updated (IST)');
+              if (uCol !== -1) fvSheet.getRange(r + 2, uCol + 1).setValue(nowStr);
+              deletedFleet = true;
+              break;
+            }
+          }
+        }
+      }
+
+      // 2. Remove from customers tab Column D
+      var custSheet = ss.getSheetByName('customers');
+      if (custSheet && custSheet.getLastRow() > 1) {
+        var cIdx = findColumnIndex(custSheet, 'Company Name');
+        var vListIdx = findColumnIndex(custSheet, 'Vehicle Numbers');
+        if (cIdx !== -1 && vListIdx !== -1) {
+          var cData = custSheet.getRange(2, 1, custSheet.getLastRow() - 1, custSheet.getLastColumn()).getValues();
+          for (var i = 0; i < cData.length; i++) {
+            if (String(cData[i][cIdx]).trim() === cName) {
+              var vList = String(cData[i][vListIdx] || '').split(',').map(function(s) { return s.trim(); }).filter(Boolean);
+              vList = vList.filter(function(v) { return v.replace(/[\s-]/g, '') !== targetVeh; });
+              custSheet.getRange(i + 2, vListIdx + 1).setValue(vList.join(', '));
+              var cuCol = findColumnIndex(custSheet, 'Last Updated (IST)');
+              if (cuCol !== -1) custSheet.getRange(i + 2, cuCol + 1).setValue(nowStr);
+              deletedCust = true;
+              break;
+            }
+          }
+        }
+      }
+
+      return respondJson({ status: 'success', action: 'delete_vehicle', deletedFleet: deletedFleet, deletedCust: deletedCust, vehicleNo: targetVeh });
+    }
+
     // ACTION: upsert (Standard single-row save)
     var tabTitle = payload.tabTitle || 'fuel_truck_orders';
     var sheet = ss.getSheetByName(tabTitle);
@@ -487,6 +600,25 @@ function upsertSingleRow(sheet, tabTitle, matchColumn, data) {
     matchColIdx = headers.length;
     headers.push(matchColumn);
     sheet.getRange(1, headers.length).setValue(matchColumn);
+  }
+
+  // Ensure any table-configured columns (like Driver Name, Driver Number) are in the sheet header
+  if (conf && conf.headers) {
+    for (var ch = 0; ch < conf.headers.length; ch++) {
+      var neededH = conf.headers[ch];
+      var foundH = false;
+      for (var eh = 0; eh < headers.length; eh++) {
+        if (String(headers[eh] || '').trim().toLowerCase() === neededH.toLowerCase()) {
+          foundH = true;
+          break;
+        }
+      }
+      if (!foundH) {
+        var nextCol = sheet.getLastColumn() + 1;
+        sheet.getRange(1, nextCol).setValue(neededH);
+        headers.push(neededH);
+      }
+    }
   }
 
   var matchValue = String(data[matchColumn] || data[conf ? conf.matchKey : ''] || '');
@@ -545,6 +677,12 @@ function resolveValue(data, headerName, conf, existingVal) {
     }
   }
 
+  // If updating an existing row and no new value was supplied in data,
+  // PRESERVE the existing cell value so partial updates never wipe data!
+  if (existingVal !== undefined && existingVal !== null && String(existingVal).trim() !== '') {
+    return existingVal;
+  }
+
   // Common heuristic fallbacks
   if (lowerH.indexOf('ticket') !== -1) return data.ticket_id || data.ticketId || '';
   if (lowerH.indexOf('customer') !== -1 || lowerH.indexOf('name') !== -1) return data.customer_name || data.customerName || data.name || '';
@@ -555,6 +693,8 @@ function resolveValue(data, headerName, conf, existingVal) {
   if (lowerH.indexOf('quantity') !== -1 || lowerH.indexOf('litres') !== -1) return data.litres !== undefined ? data.litres : 0;
   if (lowerH.indexOf('rate') !== -1) return parseFloat(data.rate_per_litre || data.rate) || 0;
   if (lowerH.indexOf('amount') !== -1) return data.estimated_amount !== undefined ? data.estimated_amount : (data.amount !== undefined ? data.amount : 0);
+  if (lowerH.indexOf('driver name') !== -1) return data.driver_name || data.driverName || '';
+  if (lowerH.indexOf('driver phone') !== -1 || lowerH.indexOf('driver number') !== -1 || lowerH.indexOf('driver mobile') !== -1) return data.driver_number || data.driver_phone || data.driverNumber || data.driverPhone || '';
   if (lowerH.indexOf('enroute') !== -1) return data.is_enroute || data.isEnroute || 'No';
   if (lowerH.indexOf('oil') !== -1 || lowerH.indexOf('lube') !== -1) return data.oil_material || data.oilMaterial || 'None';
   if (lowerH.indexOf('remark') !== -1) return data.remarks || '';
@@ -736,4 +876,52 @@ function initSheetalParivahanData() {
     status: 'success',
     message: 'Sheetal Parivahan (12 numbers, 244 vehicles) and 66 Lube products added successfully!'
   });
+}
+
+/**
+ * Synchronizes the 'fleet_vehicles' tab row-by-row with the active vehicle list
+ * from the 'customers' tab (Column D).
+ */
+function syncFleetVehiclesWithCustomers() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var custSheet = ss.getSheetByName('customers');
+  var fvSheet = ss.getSheetByName('fleet_vehicles');
+  if (!custSheet) return 'customers sheet not found';
+  if (!fvSheet) {
+    fvSheet = ss.insertSheet('fleet_vehicles');
+  }
+
+  var cIdx = findColumnIndex(custSheet, 'Company Name');
+  var vListIdx = findColumnIndex(custSheet, 'Vehicle Numbers');
+  var cData = custSheet.getRange(2, 1, custSheet.getLastRow() - 1, custSheet.getLastColumn()).getValues();
+
+  var activeVehicles = [];
+  for (var i = 0; i < cData.length; i++) {
+    if (String(cData[i][cIdx]).trim() === 'Sheetal Parivahan') {
+      activeVehicles = String(cData[i][vListIdx] || '').split(',').map(function(s) { return s.trim(); }).filter(Boolean);
+      break;
+    }
+  }
+
+  if (activeVehicles.length === 0) return 'No vehicles found in customers tab';
+
+  var nowStr = formatToIST(new Date());
+  fvSheet.clear();
+  var fvHeaders = ['Company Name', 'Vehicle No', 'Last Updated (IST)'];
+  fvSheet.getRange(1, 1, 1, fvHeaders.length).setValues([fvHeaders]);
+  fvSheet.getRange(1, 1, 1, fvHeaders.length).setFontWeight('bold').setFontColor('#FFFFFF').setBackground('#1E3A8A');
+  fvSheet.setFrozenRows(1);
+
+  var rowsToWrite = [];
+  for (var j = 0; j < activeVehicles.length; j++) {
+    rowsToWrite.push(['Sheetal Parivahan', activeVehicles[j], nowStr]);
+  }
+  if (rowsToWrite.length > 0) {
+    fvSheet.getRange(2, 1, rowsToWrite.length, 3).setValues(rowsToWrite);
+  }
+  fvSheet.setColumnWidth(1, 180);
+  fvSheet.setColumnWidth(2, 200);
+  fvSheet.setColumnWidth(3, 180);
+
+  return 'Synced ' + rowsToWrite.length + ' vehicles to fleet_vehicles tab.';
 }
