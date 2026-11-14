@@ -37,9 +37,15 @@ function groupVehiclesBySeries(vehicles) {
     other: [],
   };
 
+  const seen = new Set();
   for (const rawV of vehicles) {
     const v = String(rawV || '').toUpperCase().replace(/[\s-]/g, '');
-    if (!v || v === 'N/A') continue;
+    if (!v || v === 'N/A' || seen.has(v)) continue;
+
+    // Safety: ignore pure digits (phone numbers) or strings without letters
+    if (/^\d+$/.test(v) || v.length < 6 || !/^[A-Z]{2}/.test(v)) continue;
+
+    seen.add(v);
 
     const m = v.match(/^[A-Z]{2}[0-9]{2}([A-Z]{1,2})[0-9]{4}$/);
     if (m) {
@@ -122,6 +128,11 @@ async function syncFlowsWithLiveVehicles(activeVehicles) {
   }
 
   const buckets = groupVehiclesBySeries(activeVehicles);
+  const totalValid = Object.values(buckets).reduce((sum, b) => sum + b.length, 0);
+  if (totalValid === 0) {
+    logger.warn('[FlowSync] No valid vehicles found to sync. Aborting sync.');
+    return;
+  }
   const seriesTitles = {
     ly: `MH04 LY Series (${buckets.ly.length} Trucks)`,
     ju: `MH04 JU Series (${buckets.ju.length} Trucks)`,
@@ -184,3 +195,4 @@ module.exports = {
   syncFlowsWithLiveVehicles,
   groupVehiclesBySeries,
 };
+

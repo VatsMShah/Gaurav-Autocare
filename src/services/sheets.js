@@ -251,6 +251,7 @@ module.exports = {
   addVehicle,
   editVehicle,
   deleteVehicle,
+  findRows: store.findRows,
   saveCustomer,
   saveFuelRate,
   saveBotSession,

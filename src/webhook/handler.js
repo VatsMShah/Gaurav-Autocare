@@ -378,8 +378,14 @@ async function handleIncomingMessage(value) {
         // Automatically update Meta WhatsApp Flows so dropdowns reflect newly added/edited/deleted vehicles
         if (vehicleModified) {
           try {
-            const cust = await sheets.getCustomerByPhone(output.phone);
-            const vehicles = String(cust?.vehicles || '').split(',').map((s) => s.trim()).filter(Boolean);
+            const companyName = output.customer?.company_name || 'Sheetal Parivahan';
+            const custRows = await sheets.findRows('customers', 'Company Name', companyName);
+            const rawVehicles = custRows?.[0]?.['Vehicle Numbers'] || '';
+            let vehicles = String(rawVehicles).split(',').map((s) => s.trim()).filter(Boolean);
+            if (vehicles.length === 0) {
+              const cust = await sheets.getCustomerByPhone(output.phone);
+              vehicles = String(cust?.vehicles || '').split(',').map((s) => s.trim()).filter(Boolean);
+            }
             if (vehicles.length > 0) {
               await flowSync.syncFlowsWithLiveVehicles(vehicles);
             }

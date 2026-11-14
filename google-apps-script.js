@@ -388,23 +388,24 @@ function doPost(e) {
       var custSheet = ss.getSheetByName('customers');
       var customer = null;
       if (custSheet && custSheet.getLastRow() > 1) {
-        var numCols = Math.max(custSheet.getLastColumn(), 4);
+        var numCols = Math.max(custSheet.getLastColumn(), 5);
         var cData = custSheet.getRange(2, 1, custSheet.getLastRow() - 1, numCols).getValues();
         for (var j = 0; j < cData.length; j++) {
-          var colA = String(cData[j][0] || '').trim();
-          var colB = String(cData[j][1] || '').trim();
-          var colC = String(cData[j][2] || '').trim();
+          var colA = String(cData[j][0] || '').trim(); // Company Name
+          var colB = String(cData[j][1] || '').trim(); // Manager access Phone Numbers
+          var colC = String(cData[j][2] || '').trim(); // Authorized Phone Numbers
+          var colD = String(cData[j][3] || '').trim(); // Vehicle Numbers
 
-          // Check if searchPhone matches Column B (comma-separated authorized numbers)
+          // Check if searchPhone matches Column B (Manager access) or Column C (Authorized)
           // or Column A (legacy single phone format)
           var isMatch = false;
           var companyName = '';
           var vehicleList = '';
 
-          if (colB && colB.indexOf(searchPhone) !== -1) {
+          if ((colB && colB.indexOf(searchPhone) !== -1) || (colC && colC.indexOf(searchPhone) !== -1)) {
             isMatch = true;
             companyName = colA;
-            vehicleList = colC;
+            vehicleList = colD;
           } else if (colA && colA.replace(/\D/g, '').slice(-10) === searchPhone) {
             isMatch = true;
             companyName = String(cData[j][2] || colA);
