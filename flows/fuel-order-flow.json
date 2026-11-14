@@ -38,7 +38,7 @@
             "data-source": [
               {
                 "id": "ly",
-                "title": "MH04 LY Series (42 Trucks)"
+                "title": "MH04 LY Series (43 Trucks)"
               },
               {
                 "id": "ju",
@@ -70,7 +70,7 @@
               },
               {
                 "id": "other",
-                "title": "Other Series (JK, HD, HS, HY, NB - 17 Trucks)"
+                "title": "Other Series (18 Trucks)"
               }
             ]
           },
@@ -89,8 +89,8 @@
                     "title": "MH04LY7394"
                   },
                   {
-                    "id": "MH04LY8816",
-                    "title": "MH04LY8816"
+                    "id": "MH05LY8816",
+                    "title": "MH05LY8816"
                   },
                   {
                     "id": "MH04LY0661",
@@ -251,6 +251,10 @@
                   {
                     "id": "MH04LY7395",
                     "title": "MH04LY7395"
+                  },
+                  {
+                    "id": "MH05LY7777",
+                    "title": "MH05LY7777"
                   }
                 ]
               }
@@ -1171,6 +1175,10 @@
                   {
                     "id": "MH04JK8817",
                     "title": "MH04JK8817"
+                  },
+                  {
+                    "id": "MH05KE1212",
+                    "title": "MH05KE1212"
                   }
                 ]
               }
@@ -1222,7 +1230,7 @@
             "then": [
               {
                 "type": "TextCaption",
-                "text": "✅ Full Tank selected: Dispenser fills until auto cut-off. Litres & Amount will be calculated directly from dispenser meter."
+                "text": "\u2705 Full Tank selected: Dispenser fills until auto cut-off. Litres & Amount will be calculated directly from dispenser meter."
               }
             ]
           },
@@ -1242,7 +1250,7 @@
                   },
                   {
                     "id": "amount",
-                    "title": "Amount in ₹"
+                    "title": "Amount in \u20b9"
                   }
                 ]
               },
@@ -1253,7 +1261,7 @@
                   {
                     "type": "TextInput",
                     "name": "amount",
-                    "label": "Amount in Rupees (₹)",
+                    "label": "Amount in Rupees (\u20b9)",
                     "required": true,
                     "input-type": "number",
                     "helper-text": "e.g. 2500.00, 5000.00 (Standard .00 precision)"
@@ -1276,7 +1284,7 @@
               },
               {
                 "type": "TextCaption",
-                "text": "⛽ Standard Petrol Pump Precision: All calculations are strictly rounded and billed to 2 decimal places (.00) as per weights & measures regulations."
+                "text": "\u26fd Standard Petrol Pump Precision: All calculations are strictly rounded and billed to 2 decimal places (.00) as per weights & measures regulations."
               }
             ]
           },

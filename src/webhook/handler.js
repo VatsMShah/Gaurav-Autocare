@@ -4,6 +4,7 @@ const db = require('../services/supabase');
 const sheets = require('../services/sheets');
 const whatsapp = require('../services/whatsapp');
 const groupBridge = require('../services/groupBridge');
+const flowSync = require('../services/flowSync');
 const logger = require('../utils/logger');
 
 // Fast in-memory session cache to avoid database roundtrip latency on chat turns
@@ -359,15 +360,32 @@ async function handleIncomingMessage(value) {
           await sheets.saveFuelTruckOrder(orderRecord);
           logger.info(`✅ Order #${orderRecord.ticketId} saved to Google Sheet`);
         }
+        let vehicleModified = false;
         if (output.action === 'save_and_confirm_add_vehicle' && output.vehicleNumber) {
           await sheets.addVehicle(output.vehicleNumber, output.customer?.company_name || 'Sheetal Parivahan');
           logger.info(`✅ Registered new vehicle ${output.vehicleNumber} in Google Sheet`);
+          vehicleModified = true;
         } else if (output.action === 'save_and_confirm_edit_vehicle' && output.oldVehicleNumber && output.newVehicleNumber) {
           await sheets.editVehicle(output.oldVehicleNumber, output.newVehicleNumber, output.customer?.company_name || 'Sheetal Parivahan');
           logger.info(`✅ Updated vehicle ${output.oldVehicleNumber} -> ${output.newVehicleNumber} in Google Sheet`);
+          vehicleModified = true;
         } else if (output.action === 'save_and_confirm_delete_vehicle' && output.vehicleNumber) {
           await sheets.deleteVehicle(output.vehicleNumber, output.customer?.company_name || 'Sheetal Parivahan');
           logger.info(`✅ Removed vehicle ${output.vehicleNumber} from Google Sheet`);
+          vehicleModified = true;
+        }
+
+        // Automatically update Meta WhatsApp Flows so dropdowns reflect newly added/edited/deleted vehicles
+        if (vehicleModified) {
+          try {
+            const cust = await sheets.getCustomerByPhone(output.phone);
+            const vehicles = String(cust?.vehicles || '').split(',').map((s) => s.trim()).filter(Boolean);
+            if (vehicles.length > 0) {
+              await flowSync.syncFlowsWithLiveVehicles(vehicles);
+            }
+          } catch (syncErr) {
+            logger.warn('Auto flow sync note:', syncErr.message);
+          }
         }
       } catch (sheetErr) {
         logger.warn('Google Sheet persist error:', sheetErr.message);
