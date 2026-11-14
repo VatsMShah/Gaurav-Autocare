@@ -1,0 +1,55 @@
+{
+  "version": "6.2",
+  "screens": [
+    {
+      "id": "ADD_MANAGER",
+      "title": "Gaurav Auto Care — Add Manager",
+      "terminal": true,
+      "data": {
+        "company_name": {
+          "type": "string",
+          "__example__": "Sheetal Parivahan"
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "➕ Add Authorized Manager"
+          },
+          {
+            "type": "TextSubheading",
+            "text": "Fleet Partner: Sheetal Parivahan"
+          },
+          {
+            "type": "TextCaption",
+            "text": "Authorize a new mobile number with manager privileges to manage fleet vehicles and access all portal features."
+          },
+          {
+            "type": "TextInput",
+            "name": "manager_phone",
+            "label": "Manager Mobile Number",
+            "required": true,
+            "input-type": "number",
+            "min-chars": 10,
+            "max-chars": 10,
+            "pattern": "^[6-9][0-9]{9}$",
+            "helper-text": "10-digit mobile number, e.g. 9820500159"
+          },
+          {
+            "type": "Footer",
+            "label": "➕ Add Manager",
+            "on-click-action": {
+              "name": "complete",
+              "payload": {
+                "action": "add_manager",
+                "manager_phone": "${form.manager_phone}"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

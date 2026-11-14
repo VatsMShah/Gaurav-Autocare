@@ -191,8 +191,50 @@ async function syncFlowsWithLiveVehicles(activeVehicles) {
   }
 }
 
+/**
+ * Synchronize the Delete Manager flow dropdown with current managers
+ */
+async function syncDeleteManagerFlow(managerPhones) {
+  const flowId = config.whatsapp.deleteManagerFlowId;
+  const filePath = path.join(__dirname, '../../flows/delete-manager-flow.json');
+  if (!flowId || !fs.existsSync(filePath)) return false;
+
+  try {
+    const rawFile = fs.readFileSync(filePath, 'utf8');
+    const flowData = JSON.parse(rawFile);
+    const children = flowData.screens?.[0]?.layout?.children;
+    if (!Array.isArray(children)) return false;
+
+    const cleanPhones = Array.from(
+      new Set(
+        (managerPhones || [])
+          .map((p) => String(p).replace(/\D/g, '').slice(-10))
+          .filter((p) => p.length === 10)
+      )
+    );
+
+    for (const comp of children) {
+      if (comp.type === 'Dropdown' && comp.name === 'manager_phone') {
+        comp['data-source'] = cleanPhones.map((p) => ({
+          id: p,
+          title: `+91 ${p}`,
+        }));
+      }
+    }
+
+    const updatedJson = JSON.stringify(flowData, null, 2);
+    fs.writeFileSync(filePath, updatedJson, 'utf8');
+
+    return await uploadAndPublishFlow(flowId, updatedJson, 'Delete Manager Flow');
+  } catch (err) {
+    logger.warn('[FlowSync] Failed to sync Delete Manager flow:', err.message);
+    return false;
+  }
+}
+
 module.exports = {
   syncFlowsWithLiveVehicles,
+  syncDeleteManagerFlow,
   groupVehiclesBySeries,
 };
 

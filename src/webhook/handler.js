@@ -242,7 +242,8 @@ async function handleIncomingMessage(value) {
     output.action === 'send_fuel_buttons' ||
     output.action === 'send_litres_buttons' ||
     output.action === 'send_manager_menu' ||
-    output.action === 'send_vehicle_menu'
+    output.action === 'send_vehicle_menu' ||
+    output.action === 'send_manager_admin_menu'
   ) {
     try {
       await whatsapp.sendInteractiveButtons(
@@ -255,6 +256,22 @@ async function handleIncomingMessage(value) {
       logger.info(`Sent Interactive Buttons (${output.action}) to ` + output.phone);
     } catch (btnErr) {
       logger.warn('Failed to send interactive buttons, falling back to text', btnErr);
+      await whatsapp.sendText(output.phone, output.response);
+    }
+  } else if (output.action === 'send_add_manager_flow') {
+    try {
+      await whatsapp.sendAddManagerFlow(output.phone, config.whatsapp.addManagerFlowId, output.customer);
+      logger.info('Sent WhatsApp Add Manager Flow to ' + output.phone);
+    } catch (flowErr) {
+      logger.warn('Failed to send Add Manager Flow, falling back to text', flowErr);
+      await whatsapp.sendText(output.phone, output.response);
+    }
+  } else if (output.action === 'send_delete_manager_flow') {
+    try {
+      await whatsapp.sendDeleteManagerFlow(output.phone, config.whatsapp.deleteManagerFlowId, output.customer);
+      logger.info('Sent WhatsApp Delete Manager Flow to ' + output.phone);
+    } catch (flowErr) {
+      logger.warn('Failed to send Delete Manager Flow, falling back to text', flowErr);
       await whatsapp.sendText(output.phone, output.response);
     }
   } else if (output.action === 'send_add_vehicle_flow') {
@@ -284,7 +301,9 @@ async function handleIncomingMessage(value) {
   } else if (
     output.action === 'save_and_confirm_add_vehicle' ||
     output.action === 'save_and_confirm_edit_vehicle' ||
-    output.action === 'save_and_confirm_delete_vehicle'
+    output.action === 'save_and_confirm_delete_vehicle' ||
+    output.action === 'save_and_confirm_add_manager' ||
+    output.action === 'save_and_confirm_delete_manager'
   ) {
     try {
       await whatsapp.sendInteractiveButtons(
@@ -391,6 +410,34 @@ async function handleIncomingMessage(value) {
             }
           } catch (syncErr) {
             logger.warn('Auto flow sync note:', syncErr.message);
+          }
+        }
+
+        let managerModified = false;
+        let updatedManagerList = [];
+        if (output.action === 'save_and_confirm_add_manager' && output.managerPhone) {
+          const res = await sheets.addManager(output.managerPhone, output.customer?.company_name || 'Sheetal Parivahan');
+          logger.info(`✅ Registered new manager ${output.managerPhone} in Google Sheet`);
+          managerModified = true;
+          updatedManagerList = res?.managers || [];
+        } else if (output.action === 'save_and_confirm_delete_manager' && output.managerPhone) {
+          const res = await sheets.deleteManager(output.managerPhone, output.customer?.company_name || 'Sheetal Parivahan');
+          if (res?.isLastManager) {
+            logger.warn(`⚠️ Blocked deletion of last remaining manager ${output.managerPhone}`);
+            await whatsapp.sendText(output.phone, `⚠️ *Action Blocked:* Cannot delete the only remaining active manager (+91 ${output.managerPhone}). At least one manager must remain.`);
+          } else {
+            logger.info(`✅ Removed manager ${output.managerPhone} from Google Sheet`);
+            managerModified = true;
+            updatedManagerList = res?.managers || [];
+          }
+        }
+
+        // Automatically update Meta WhatsApp Delete Manager Flow so dropdown reflects updated managers
+        if (managerModified && updatedManagerList.length > 0) {
+          try {
+            await flowSync.syncDeleteManagerFlow(updatedManagerList);
+          } catch (syncErr) {
+            logger.warn('Auto manager flow sync note:', syncErr.message);
           }
         }
       } catch (sheetErr) {

@@ -24,6 +24,8 @@ module.exports = {
     addVehicleFlowId: (process.env.WHATSAPP_ADD_VEHICLE_FLOW_ID || '2592337911241483').trim(),
     editVehicleFlowId: (process.env.WHATSAPP_EDIT_VEHICLE_FLOW_ID || '1666831991518273').trim(),
     deleteVehicleFlowId: (process.env.WHATSAPP_DELETE_VEHICLE_FLOW_ID || '1511816160829597').trim(),
+    addManagerFlowId: (process.env.WHATSAPP_ADD_MANAGER_FLOW_ID || '1151828614121424').trim(),
+    deleteManagerFlowId: (process.env.WHATSAPP_DELETE_MANAGER_FLOW_ID || '1461123712019738').trim(),
   },
   supabase: {
     url: required('SUPABASE_URL'),

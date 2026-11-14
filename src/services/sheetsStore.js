@@ -526,6 +526,128 @@ async function deleteVehicle(vehicleNo, companyName = 'Sheetal Parivahan') {
   return { success: true, vehicleNo: clean };
 }
 
+/**
+ * Add a new manager phone number to customers tab Column B
+ */
+async function addManager(phone, companyName = 'Sheetal Parivahan') {
+  const clean = String(phone || '').replace(/\D/g, '').slice(-10);
+  if (!clean || clean.length !== 10 || !/^[6-9]\d{9}$/.test(clean)) {
+    return { success: false, invalid: true, phone };
+  }
+
+  const nowStr = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+
+  try {
+    const custRows = await findRows('customers', 'Company Name', companyName);
+    const existing = custRows && custRows.length > 0 ? custRows[0] : {};
+
+    const rawManagers = String(
+      existing['Manager access Phone Numbers'] ||
+      existing['manager_access_phone_numbers'] ||
+      DEFAULT_MANAGER_PHONES
+    );
+
+    let currentManagers = (rawManagers.match(/\d{10,12}/g) || []).map((m) => m.slice(-10));
+    if (currentManagers.length === 0) {
+      currentManagers = rawManagers
+        .split(',')
+        .map((s) => s.replace(/\D/g, '').slice(-10))
+        .filter((s) => s.length === 10);
+    }
+
+    if (currentManagers.includes(clean)) {
+      return { success: true, alreadyExists: true, phone: clean, managers: currentManagers };
+    }
+
+    currentManagers.push(clean);
+
+    const authPhones = existing['Authorized Phone Numbers'] || DEFAULT_AUTH_PHONES;
+    const vehicles = existing['Vehicle Numbers'] || '';
+
+    await upsertRow('customers', 'Company Name', {
+      'Company Name': companyName,
+      'Manager access Phone Numbers': currentManagers.join(', '),
+      'Authorized Phone Numbers': authPhones,
+      'Vehicle Numbers': vehicles,
+      'Last Updated (IST)': nowStr,
+    });
+
+    managerPhoneCache.data.add(clean);
+    managerPhoneCache.lastFetched = Date.now();
+    customerCache.clear();
+    logger.info(`✅ Added manager ${clean} to Google Sheet and in-memory cache`);
+
+    return { success: true, added: true, phone: clean, managers: currentManagers };
+  } catch (err) {
+    logger.warn('Failed to add manager to customers tab:', err.message);
+    throw err;
+  }
+}
+
+/**
+ * Remove a manager phone number from customers tab Column B
+ */
+async function deleteManager(phone, companyName = 'Sheetal Parivahan') {
+  const clean = String(phone || '').replace(/\D/g, '').slice(-10);
+  const nowStr = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+
+  try {
+    const custRows = await findRows('customers', 'Company Name', companyName);
+    const existing = custRows && custRows.length > 0 ? custRows[0] : {};
+
+    const rawManagers = String(
+      existing['Manager access Phone Numbers'] ||
+      existing['manager_access_phone_numbers'] ||
+      DEFAULT_MANAGER_PHONES
+    );
+
+    let currentManagers = (rawManagers.match(/\d{10,12}/g) || []).map((m) => m.slice(-10));
+    if (currentManagers.length === 0) {
+      currentManagers = rawManagers
+        .split(',')
+        .map((s) => s.replace(/\D/g, '').slice(-10))
+        .filter((s) => s.length === 10);
+    }
+
+    if (!currentManagers.includes(clean)) {
+      return { success: false, notFound: true, phone: clean, managers: currentManagers };
+    }
+
+    // Edge Case: Do not allow deleting the last remaining manager
+    if (currentManagers.length <= 1) {
+      return {
+        success: false,
+        isLastManager: true,
+        message: 'Cannot delete the only remaining active manager.',
+        managers: currentManagers,
+      };
+    }
+
+    currentManagers = currentManagers.filter((p) => p !== clean);
+
+    const authPhones = existing['Authorized Phone Numbers'] || DEFAULT_AUTH_PHONES;
+    const vehicles = existing['Vehicle Numbers'] || '';
+
+    await upsertRow('customers', 'Company Name', {
+      'Company Name': companyName,
+      'Manager access Phone Numbers': currentManagers.join(', '),
+      'Authorized Phone Numbers': authPhones,
+      'Vehicle Numbers': vehicles,
+      'Last Updated (IST)': nowStr,
+    });
+
+    managerPhoneCache.data.delete(clean);
+    managerPhoneCache.lastFetched = Date.now();
+    customerCache.clear();
+    logger.info(`✅ Removed manager ${clean} from Google Sheet and in-memory cache`);
+
+    return { success: true, deleted: true, phone: clean, managers: currentManagers };
+  } catch (err) {
+    logger.warn('Failed to delete manager from customers tab:', err.message);
+    throw err;
+  }
+}
+
 module.exports = {
   getDoc,
   findRows,
@@ -536,4 +658,6 @@ module.exports = {
   addVehicle,
   editVehicle,
   deleteVehicle,
+  addManager,
+  deleteManager,
 };

@@ -367,6 +367,82 @@ async function markAsReadAndTyping(messageId) {
   }
 }
 
+/**
+ * Sends the Add Manager Flow
+ */
+async function sendAddManagerFlow(to, flowId, customerInfo = {}) {
+  const companyName = customerInfo.company_name || customerInfo.company || 'Sheetal Parivahan';
+  return callGraphApi({
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to,
+    type: 'interactive',
+    interactive: {
+      type: 'flow',
+      header: { type: 'text', text: 'Gaurav Auto Care' },
+      body: {
+        text:
+          `👥 *Manager Management — Add Manager*\n\n` +
+          `🏢 *Fleet Partner:* ${companyName}\n\n` +
+          `Please tap below to authorize a new manager mobile number:`,
+      },
+      footer: { text: 'Gaurav Auto Care Manager Desk' },
+      action: {
+        name: 'flow',
+        parameters: {
+          flow_message_version: '3',
+          flow_token: `add_mgr_${to}_${Date.now()}`,
+          flow_id: flowId,
+          flow_cta: '➕ Add Manager',
+          flow_action: 'navigate',
+          flow_action_payload: {
+            screen: 'ADD_MANAGER',
+            data: { company_name: companyName },
+          },
+        },
+      },
+    },
+  });
+}
+
+/**
+ * Sends the Delete Manager Flow
+ */
+async function sendDeleteManagerFlow(to, flowId, customerInfo = {}) {
+  const companyName = customerInfo.company_name || customerInfo.company || 'Sheetal Parivahan';
+  return callGraphApi({
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to,
+    type: 'interactive',
+    interactive: {
+      type: 'flow',
+      header: { type: 'text', text: 'Gaurav Auto Care' },
+      body: {
+        text:
+          `👥 *Manager Management — Delete Manager*\n\n` +
+          `🏢 *Fleet Partner:* ${companyName}\n\n` +
+          `Please tap below to select a manager number to revoke privileges:`,
+      },
+      footer: { text: 'Gaurav Auto Care Manager Desk' },
+      action: {
+        name: 'flow',
+        parameters: {
+          flow_message_version: '3',
+          flow_token: `del_mgr_${to}_${Date.now()}`,
+          flow_id: flowId,
+          flow_cta: '🗑️ Delete Manager',
+          flow_action: 'navigate',
+          flow_action_payload: {
+            screen: 'DELETE_MANAGER',
+            data: { company_name: companyName },
+          },
+        },
+      },
+    },
+  });
+}
+
 module.exports = {
   sendText,
   sendCtaButtons,
@@ -375,6 +451,8 @@ module.exports = {
   sendAddVehicleFlow,
   sendEditVehicleFlow,
   sendDeleteVehicleFlow,
+  sendAddManagerFlow,
+  sendDeleteManagerFlow,
   sendInteractiveButtons,
   sendInteractiveList,
   markAsReadAndTyping,

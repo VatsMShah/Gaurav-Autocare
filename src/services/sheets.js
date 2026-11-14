@@ -242,6 +242,16 @@ async function deleteVehicle(vehicleNo, companyName) {
   return store.deleteVehicle(vehicleNo, companyName);
 }
 
+async function addManager(phone, companyName) {
+  if (!isConfigured()) return { success: true, phone };
+  return store.addManager(phone, companyName);
+}
+
+async function deleteManager(phone, companyName) {
+  if (!isConfigured()) return { success: true, phone };
+  return store.deleteManager(phone, companyName);
+}
+
 module.exports = {
   isConfigured,
   saveFuelTruckOrder,
@@ -251,6 +261,8 @@ module.exports = {
   addVehicle,
   editVehicle,
   deleteVehicle,
+  addManager,
+  deleteManager,
   findRows: store.findRows,
   saveCustomer,
   saveFuelRate,

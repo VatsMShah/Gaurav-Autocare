@@ -513,6 +513,137 @@ function processConversation(waMessagePayload, masterRows = [], currentRates = n
     };
   }
 
+  // Handle "Modify Manager" button from manager menu
+  const isModifyManager =
+    !flowResponse &&
+    (
+      buttonId === 'btn_modify_manager' ||
+      buttonTitle.toLowerCase().includes('modify manager') ||
+      normalizedText === 'btn_modify_manager' ||
+      normalizedText.includes('modify manager') ||
+      normalizedText.includes('manage manager')
+    );
+
+  if (isModifyManager) {
+    if (!isManager) {
+      return {
+        user_id: `${phone}_${Date.now()}`,
+        phone,
+        customer,
+        state: 'awaiting_details',
+        action: 'send_text',
+        response: '⛔ *Access Restricted: Manager modification is available for authorized fleet managers only.*',
+        updated_at: new Date().toISOString(),
+      };
+    }
+
+    memorySessions.set(phone, {
+      state: 'manager_admin_menu',
+      data: { customer },
+      updated_at: new Date().toISOString(),
+    });
+
+    return {
+      user_id: `${phone}_${Date.now()}`,
+      phone,
+      customer,
+      state: 'manager_admin_menu',
+      action: 'send_manager_admin_menu',
+      header: 'Gaurav Auto Care',
+      response:
+        `👥 *Manager Management Portal*\n\n` +
+        `🏢 *Fleet Partner:* ${customer.company_name || 'Sheetal Parivahan'}\n` +
+        `👤 *Authorized Manager:* ${customer.phone}\n\n` +
+        `Please select an option below to manage fleet managers:`,
+      footer: 'Gaurav Auto Care Fleet Desk',
+      buttons: [
+        { id: 'btn_action_add_manager', title: '➕ Add Manager' },
+        { id: 'btn_action_delete_manager', title: '🗑️ Delete Manager' },
+      ],
+      updated_at: new Date().toISOString(),
+    };
+  }
+
+  // Handle "Add Manager" button
+  const isAddManagerAction =
+    !flowResponse &&
+    (
+      buttonId === 'btn_action_add_manager' ||
+      buttonTitle.toLowerCase().includes('add manager') ||
+      normalizedText === 'btn_action_add_manager' ||
+      normalizedText === 'add manager'
+    );
+
+  if (isAddManagerAction) {
+    if (!isManager) {
+      return {
+        user_id: `${phone}_${Date.now()}`,
+        phone,
+        customer,
+        state: 'awaiting_details',
+        action: 'send_text',
+        response: '⛔ *Access Restricted: Adding fleet managers is available for authorized fleet managers only.*',
+        updated_at: new Date().toISOString(),
+      };
+    }
+
+    memorySessions.set(phone, {
+      state: 'awaiting_add_manager_flow',
+      data: { customer },
+      updated_at: new Date().toISOString(),
+    });
+
+    return {
+      user_id: `${phone}_${Date.now()}`,
+      phone,
+      customer,
+      state: 'awaiting_add_manager_flow',
+      action: 'send_add_manager_flow',
+      response: 'Please tap below to authorize a new manager.',
+      updated_at: new Date().toISOString(),
+    };
+  }
+
+  // Handle "Delete Manager" button
+  const isDeleteManagerAction =
+    !flowResponse &&
+    (
+      buttonId === 'btn_action_delete_manager' ||
+      buttonTitle.toLowerCase().includes('delete manager') ||
+      normalizedText === 'btn_action_delete_manager' ||
+      normalizedText === 'delete manager'
+    );
+
+  if (isDeleteManagerAction) {
+    if (!isManager) {
+      return {
+        user_id: `${phone}_${Date.now()}`,
+        phone,
+        customer,
+        state: 'awaiting_details',
+        action: 'send_text',
+        response: '⛔ *Access Restricted: Deleting fleet managers is available for authorized fleet managers only.*',
+        updated_at: new Date().toISOString(),
+      };
+    }
+
+    memorySessions.set(phone, {
+      state: 'awaiting_delete_manager_flow',
+      data: { customer },
+      updated_at: new Date().toISOString(),
+    });
+
+    return {
+      user_id: `${phone}_${Date.now()}`,
+      phone,
+      customer,
+      state: 'awaiting_delete_manager_flow',
+      action: 'send_delete_manager_flow',
+      response: 'Please tap below to remove a manager from your fleet.',
+      updated_at: new Date().toISOString(),
+    };
+  }
+
   // Handle "Order Another", new order, restart, or greeting
   const isNewOrder =
     !flowResponse &&
@@ -642,6 +773,7 @@ function processConversation(waMessagePayload, masterRows = [], currentRates = n
       buttons: [
         { id: 'btn_book_fuel', title: '📋 Book Fuel' },
         { id: 'btn_modify_vehicle', title: '🚛 Modify Vehicle' },
+        { id: 'btn_modify_manager', title: '👥 Modify Manager' },
       ],
       updated_at: new Date().toISOString(),
     };
@@ -746,6 +878,7 @@ function processConversation(waMessagePayload, masterRows = [], currentRates = n
         buttons: [
           { id: 'btn_book_fuel', title: '📋 Book Fuel' },
           { id: 'btn_modify_vehicle', title: '🚛 Modify Vehicle' },
+          { id: 'btn_modify_manager', title: '👥 Modify Manager' },
         ],
         updated_at: new Date().toISOString(),
       };
@@ -778,6 +911,7 @@ function processConversation(waMessagePayload, masterRows = [], currentRates = n
       buttons: [
         { id: 'btn_book_fuel', title: '📋 Book Fuel' },
         { id: 'btn_modify_vehicle', title: '🚛 Modify Vehicle' },
+        { id: 'btn_modify_manager', title: '👥 Modify Manager' },
       ],
       updated_at: new Date().toISOString(),
     };
@@ -859,6 +993,152 @@ function processConversation(waMessagePayload, masterRows = [], currentRates = n
       buttons: [
         { id: 'btn_book_fuel', title: '📋 Book Fuel' },
         { id: 'btn_modify_vehicle', title: '🚛 Modify Vehicle' },
+        { id: 'btn_modify_manager', title: '👥 Modify Manager' },
+      ],
+      updated_at: new Date().toISOString(),
+    };
+  }
+
+  // Flow Response: ADD MANAGER
+  if (
+    flowResponse &&
+    (flowResponse.action === 'add_manager' ||
+      (flowResponse.manager_phone &&
+        !flowResponse.vehicle_number &&
+        !flowResponse.vehicle_series &&
+        flowResponse.action !== 'delete_manager'))
+  ) {
+    if (!isManager) {
+      return {
+        user_id: `${phone}_${Date.now()}`,
+        phone,
+        customer,
+        state: 'access_denied',
+        action: 'send_text',
+        response: '⛔ *Access Restricted: Adding fleet managers is available for authorized fleet managers only.*',
+        updated_at: new Date().toISOString(),
+      };
+    }
+
+    const rawNewManager = String(flowResponse.manager_phone || '').trim();
+    const cleanNewManager = rawNewManager.replace(/\D/g, '').slice(-10);
+    const timeStr = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+
+    // Validation: 10-digit Indian mobile starting with 6-9
+    if (!cleanNewManager || cleanNewManager.length !== 10 || !/^[6-9]\d{9}$/.test(cleanNewManager)) {
+      return {
+        user_id: `${phone}_${Date.now()}`,
+        phone,
+        customer,
+        state: 'manager_admin_menu',
+        action: 'send_manager_admin_menu',
+        header: 'Gaurav Auto Care',
+        response:
+          `⚠️ *Invalid Phone Number Format*\n\n` +
+          `Received: "${rawNewManager}"\n` +
+          `Please provide a valid 10-digit Indian mobile number (e.g. 9820500159).`,
+        footer: 'Gaurav Auto Care Fleet Desk',
+        buttons: [
+          { id: 'btn_action_add_manager', title: '➕ Try Again' },
+          { id: 'btn_book_fuel', title: '📋 Book Fuel' },
+        ],
+        updated_at: new Date().toISOString(),
+      };
+    }
+
+    memorySessions.set(phone, {
+      state: 'manager_added',
+      data: { newManager: cleanNewManager, addedAt: timeStr },
+      updated_at: new Date().toISOString(),
+    });
+
+    return {
+      user_id: `${phone}_${Date.now()}`,
+      phone,
+      customer,
+      state: 'manager_added',
+      action: 'save_and_confirm_add_manager',
+      managerPhone: cleanNewManager,
+      header: 'Gaurav Auto Care',
+      response:
+        `✅ *Authorized Manager Added Successfully!*\n\n` +
+        `🏢 *Fleet Partner:* ${customer.company_name || 'Sheetal Parivahan'}\n` +
+        `👤 *New Manager Mobile:* *+91 ${cleanNewManager}*\n` +
+        `👮 *Authorized By:* +91 ${cleanPhone}\n` +
+        `📅 *Timestamp:* ${timeStr} IST\n\n` +
+        `This number now has full manager privileges to manage fleet vehicles and access the portal.`,
+      footer: 'Gaurav Auto Care Fleet Manager',
+      buttons: [
+        { id: 'btn_book_fuel', title: '📋 Book Fuel' },
+        { id: 'btn_modify_vehicle', title: '🚛 Modify Vehicle' },
+        { id: 'btn_modify_manager', title: '👥 Modify Manager' },
+      ],
+      updated_at: new Date().toISOString(),
+    };
+  }
+
+  // Flow Response: DELETE MANAGER
+  if (flowResponse && flowResponse.action === 'delete_manager') {
+    if (!isManager) {
+      return {
+        user_id: `${phone}_${Date.now()}`,
+        phone,
+        customer,
+        state: 'access_denied',
+        action: 'send_text',
+        response: '⛔ *Access Restricted: Deleting fleet managers is available for authorized fleet managers only.*',
+        updated_at: new Date().toISOString(),
+      };
+    }
+
+    const rawTarget = String(flowResponse.manager_phone || '').trim();
+    const cleanTarget = rawTarget.replace(/\D/g, '').slice(-10);
+    const timeStr = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+
+    if (!cleanTarget || cleanTarget.length !== 10) {
+      return {
+        user_id: `${phone}_${Date.now()}`,
+        phone,
+        customer,
+        state: 'manager_admin_menu',
+        action: 'send_manager_admin_menu',
+        header: 'Gaurav Auto Care',
+        response: `⚠️ *Invalid Manager Selection*\n\nPlease select a valid manager number from the list.`,
+        footer: 'Gaurav Auto Care Fleet Desk',
+        buttons: [
+          { id: 'btn_action_delete_manager', title: '🗑️ Try Again' },
+          { id: 'btn_book_fuel', title: '📋 Book Fuel' },
+        ],
+        updated_at: new Date().toISOString(),
+      };
+    }
+
+    memorySessions.set(phone, {
+      state: 'manager_deleted',
+      data: { deletedManager: cleanTarget, deletedAt: timeStr },
+      updated_at: new Date().toISOString(),
+    });
+
+    return {
+      user_id: `${phone}_${Date.now()}`,
+      phone,
+      customer,
+      state: 'manager_deleted',
+      action: 'save_and_confirm_delete_manager',
+      managerPhone: cleanTarget,
+      header: 'Gaurav Auto Care',
+      response:
+        `🗑️ *Manager Access Revoked Successfully!*\n\n` +
+        `🏢 *Fleet Partner:* ${customer.company_name || 'Sheetal Parivahan'}\n` +
+        `👤 *Revoked Manager:* *+91 ${cleanTarget}*\n` +
+        `👮 *Removed By:* +91 ${cleanPhone}\n` +
+        `📅 *Timestamp:* ${timeStr} IST\n\n` +
+        `This mobile number no longer has manager privileges.`,
+      footer: 'Gaurav Auto Care Fleet Manager',
+      buttons: [
+        { id: 'btn_book_fuel', title: '📋 Book Fuel' },
+        { id: 'btn_modify_vehicle', title: '🚛 Modify Vehicle' },
+        { id: 'btn_modify_manager', title: '👥 Modify Manager' },
       ],
       updated_at: new Date().toISOString(),
     };
@@ -1004,6 +1284,7 @@ function processConversation(waMessagePayload, masterRows = [], currentRates = n
         buttons: [
           { id: 'btn_book_fuel', title: '📋 Book Fuel' },
           { id: 'btn_modify_vehicle', title: '🚛 Modify Vehicle' },
+          { id: 'btn_modify_manager', title: '👥 Modify Manager' },
         ],
         updated_at: new Date().toISOString(),
       };
@@ -1097,6 +1378,7 @@ function processConversation(waMessagePayload, masterRows = [], currentRates = n
       buttons: [
         { id: 'btn_book_fuel', title: '📋 Book Fuel' },
         { id: 'btn_modify_vehicle', title: '🚛 Modify Vehicle' },
+        { id: 'btn_modify_manager', title: '👥 Modify Manager' },
       ],
       updated_at: new Date().toISOString(),
     };

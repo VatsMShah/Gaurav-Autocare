@@ -1,0 +1,60 @@
+{
+  "version": "6.2",
+  "screens": [
+    {
+      "id": "DELETE_MANAGER",
+      "title": "Gaurav Auto Care — Delete Manager",
+      "terminal": true,
+      "data": {
+        "company_name": {
+          "type": "string",
+          "__example__": "Sheetal Parivahan"
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "🗑️ Delete Manager"
+          },
+          {
+            "type": "TextSubheading",
+            "text": "Fleet Partner: Sheetal Parivahan"
+          },
+          {
+            "type": "TextCaption",
+            "text": "Select an authorized manager mobile number to revoke their manager portal privileges."
+          },
+          {
+            "type": "Dropdown",
+            "name": "manager_phone",
+            "label": "Select Manager Mobile Number",
+            "required": true,
+            "data-source": [
+              {
+                "id": "9323265076",
+                "title": "+91 9323265076"
+              },
+              {
+                "id": "9820500159",
+                "title": "+91 9820500159"
+              }
+            ]
+          },
+          {
+            "type": "Footer",
+            "label": "🗑️ Delete Manager",
+            "on-click-action": {
+              "name": "complete",
+              "payload": {
+                "action": "delete_manager",
+                "manager_phone": "${form.manager_phone}"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
