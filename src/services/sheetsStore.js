@@ -301,8 +301,13 @@ async function upsertRow(tabTitle, matchColumn, data) {
   return newRow.toObject();
 }
 
+const initialManagers = (process.env.MANAGER_PHONES || '9323265076,9820500159,8680922991')
+  .split(',')
+  .map((p) => p.replace(/\D/g, '').slice(-10))
+  .filter(Boolean);
+
 const managerPhoneCache = {
-  data: new Set(['9323265076', '9820500159']),
+  data: new Set(initialManagers),
   lastFetched: 0,
   ttl: 5 * 60 * 1000, // 5 minutes cache
 };
@@ -354,8 +359,8 @@ async function getManagerPhones() {
   return managerPhoneCache.data;
 }
 
-const DEFAULT_MANAGER_PHONES = '9323265076';
-const DEFAULT_AUTH_PHONES = '9076021348, 7400062501, 9324993903, 7738022509, 8291083855, 9920981780, 7777030315, 9594780757, 9324983249, 9833611124, 7985916674, 9820500159, 9820216600, 9867025711, 8976976900, 9323265076';
+const DEFAULT_MANAGER_PHONES = process.env.MANAGER_PHONES || '9323265076, 9820500159, 8680922991';
+const DEFAULT_AUTH_PHONES = '';
 
 /**
  * Add a new vehicle to fleet_vehicles tab and update customers tab

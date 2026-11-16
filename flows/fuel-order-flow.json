@@ -1311,12 +1311,12 @@
           {
             "type": "TextInput",
             "name": "driver_number",
-            "label": "Q5b. Driver Number",
+            "label": "Q5b. Driver Mobile (+91)",
             "required": true,
             "input-type": "phone",
             "min-chars": 10,
-            "max-chars": 10,
-            "helper-text": "10-digit mobile number (e.g. 9820500159)"
+            "max-chars": 13,
+            "helper-text": "Enter 10-digit number (e.g. 9820500159)"
           },
           {
             "type": "Dropdown",

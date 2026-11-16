@@ -1,29 +1,9 @@
 const { extractCustomerInfo } = require('../services/customerService');
 const logger = require('../utils/logger');
 
-// Authorized mobile numbers for Sheetal Parivahan (commercial fleet booking)
-const AUTHORIZED_PHONES = new Set([
-  '9076021348',
-  '7400062501',
-  '9324993903',
-  '7738022509',
-  '8291083855',
-  '9920981780',
-  '7777030315',
-  '9594780757',
-  '9324983249',
-  '9833611124',
-  '7985916674',
-  '9820500159',
-  '9820216600',
-  '9867025711',
-  '8976976900',
-  '9323265076',
-]);
-
-// Authorized Fleet Managers (permitted to access Vehicle Management & Admin options)
+// Authorized Fleet Managers fallback (Primary source is Google Sheets customers tab Column B)
 const MANAGER_PHONES = new Set(
-  (process.env.MANAGER_PHONES || '9323265076,9820500159')
+  (process.env.MANAGER_PHONES || '9323265076,9820500159,8680922991')
     .split(',')
     .map((p) => p.replace(/\D/g, '').slice(-10))
     .filter(Boolean)
@@ -255,13 +235,12 @@ function processConversation(waMessagePayload, masterRows = [], currentRates = n
     (dynamicManagerPhones instanceof Set && dynamicManagerPhones.has(cleanPhone)) ||
     (Array.isArray(dynamicManagerPhones) && dynamicManagerPhones.includes(cleanPhone));
 
-  // Strict Sheetal Parivahan Authorization Check
+  // Dynamic Database Authorization Check (Google Sheets customers tab Column B or C)
   const isSheetRegistered = Boolean(preloadedCustomer && preloadedCustomer.isRegistered);
   const isAuthorized =
     !phone ||
     phone === 'unknown_user' ||
     cleanPhone.startsWith('000') ||
-    AUTHORIZED_PHONES.has(cleanPhone) ||
     isManager ||
     isSheetRegistered;
 
