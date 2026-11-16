@@ -1213,7 +1213,7 @@ function processConversation(waMessagePayload, masterRows = [], currentRates = n
       amount_display: amountDisplay,
       rate_per_litre: rate,
       driver_name: (flowResponse.driver_name || '').trim() || 'N/A',
-      driver_number: (flowResponse.driver_number || '').trim() || 'N/A',
+      driver_number: (flowResponse.driver_number ? String(flowResponse.driver_number).replace(/\D/g, '').slice(-10) : '') || 'N/A',
       is_enroute: flowResponse.is_enroute ? (String(flowResponse.is_enroute).toLowerCase() === 'yes' ? 'Yes' : 'No') : 'No',
       oil_material: flowResponse.oil_material || 'None',
       remarks: (flowResponse.remarks || '').trim() || 'N/A',

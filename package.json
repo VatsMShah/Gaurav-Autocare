@@ -8,6 +8,7 @@
     "node": ">=18.0.0"
   },
   "scripts": {
+    "test": "node test/bot.test.js",
     "dev": "node --watch src/index.js",
     "start": "node src/index.js",
     "tunnel": "cloudflared tunnel --url http://localhost:3005",
